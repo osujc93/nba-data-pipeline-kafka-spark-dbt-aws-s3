@@ -1,7 +1,7 @@
 # NBA-Data-Pipeline
 Data pipeline for NBA player boxscores using Kafka, Spark, Dbt, AWS S3 and more.
 
-![Diagram](/assets/nbaDiagram2.png)
+![Diagram](/assets/nbaDiagram.png)
 
 Contents
 =================
