@@ -1,0 +1,46 @@
+groups:
+  - name: zookeeper_recording_rules
+    rules:
+      # Record average CPU usage per instance
+      - record: instance:zookeeper_cpu_usage:avg
+        expr: avg by (job, instance) (rate(process_cpu_seconds_total[5m])) * 100
+
+      # Record average memory usage per instance
+      - record: instance:zookeeper_memory_usage:avg
+        expr: avg by (job, instance) (jvm_memory_heap_used_bytes / jvm_memory_heap_max_bytes) * 100
+
+      # Record total number of znodes
+      - record: job:zookeeper_znode_count:total
+        expr: sum by (job) (znode_count)
+
+      # Record total number of alive connections
+      - record: job:zookeeper_num_alive_connections:total
+        expr: sum by (job) (num_alive_connections)
+
+      # Record approximate data size in MB
+      - record: job:zookeeper_approximate_data_size_mb
+        expr: (sum by (job) (approximate_data_size)) / (1024 * 1024)
+
+      # Record total watch count
+      - record: job:zookeeper_watch_count:total
+        expr: sum by (job) (watch_count)
+
+      # Record total leader election count over 5 minutes
+      - record: job:zookeeper_leader_election_count:increase5m
+        expr: increase(election_time_count[5m])
+
+      # Record total open file descriptors
+      - record: job:zookeeper_open_file_descriptor_count:total
+        expr: sum by (job) (open_file_descriptor_count)
+
+      # Record fsync time rate per minute
+      - record: job:zookeeper_fsync_time_rate
+        expr: rate(fsynctime_sum[1m])
+
+      # Record snapshot time rate over 5 minutes
+      - record: job:zookeeper_snapshot_time_rate
+        expr: rate(snapshottime_sum[5m])
+
+      # Record average latency per instance
+      - record: instance:zookeeper_avg_latency:avg
+        expr: avg by (job, instance) (avg_latency)

@@ -1,0 +1,110 @@
+#!/usr/bin/env sh
+
+# Exit immediately if a command exits with a non-zero status
+set -e
+
+# Remove existing PID file to prevent startup issues
+rm -f ./RUNNING_PID
+
+# Ensure SERVER_NAME is set; exit if not
+if [ -z "$SERVER_NAME" ]; then
+  echo "Error: SERVER_NAME is not set. Exiting."
+  exit 1
+fi
+
+# Define ROOT_SERVER_PATH using SERVER_NAME
+ROOT_SERVER_PATH="/app/${SERVER_NAME}-server"
+
+# Export ROOT_SERVER_PATH so it's available to child processes
+export ROOT_SERVER_PATH
+
+# Optionally, you can log the ROOT_SERVER_PATH for debugging
+echo "ROOT_SERVER_PATH is set to: $ROOT_SERVER_PATH"
+
+# Generate a random secret key if not already set
+export SECRET_KEY=${SECRET_KEY:-$(tr -dc 'a-zA-Z0-9~!@#$%^&*_-' < /dev/urandom | head -c 64)}
+
+# Define Zookeeper JAR version for Bitnami Zookeeper 3.9.2
+ZOOKEEPER_JAR_VERSION=${ZOOKEEPER_JAR_VERSION:-"3.9.2"}
+ZOOKEEPER_JAR="zookeeper-${ZOOKEEPER_JAR_VERSION}.jar"
+
+# Ensure the Zookeeper JAR exists in the 'extra' directory
+if [ ! -f "/app/extra/${ZOOKEEPER_JAR}" ]; then
+  echo "Zookeeper client JAR (${ZOOKEEPER_JAR}) not found in '/app/extra/' directory."
+  exit 1
+fi
+
+# Set Java options with environment variables for flexibility and security
+JAVA_OPTS="$JAVA_OPTS \
+  -XX:+UseContainerSupport \
+  -server \
+  -Dzookeeper.kinit=${ZOOKEEPER_KINIT_PATH:-"/usr/bin/kinit"} \
+  -Dplay.assets.path=${PLAY_ASSETS_PATH:-"/public"} \
+  -Dplay.assets.urlPrefix=${PLAY_ASSETS_URL_PREFIX:-"/"} \
+  -Djava.security.auth.login.config=${JAVA_JAAS_LOGIN_CONFIG:-"/app/jaas_client.conf"} \
+  -Djava.security.krb5.conf=${JAVA_KRB5_CONF:-"/etc/krb5.conf"} \
+  -Dsun.security.krb5.debug=${SUN_SECURITY_KRB5_DEBUG:-"true"} \
+  -Djavax.security.auth.useSubjectCredsOnly=${USE_SUBJECT_CREDS_ONLY:-"false"} \
+  -Dzookeeper.sasl.clientconfig=${ZOOKEEPER_SASL_CLIENT_CONFIG:-"Client"} \
+  -Dzookeeper.client.secure=${ZOOKEEPER_CLIENT_SECURE:-"true"} \
+  -Dzookeeper.sasl.client=${ZOOKEEPER_SASL_CLIENT:-"true"} \
+  -Dzookeeper.clientCnxnSocket=${ZOOKEEPER_CLIENT_CNXN_SOCKET:-"org.apache.zookeeper.ClientCnxnSocketNetty"} \
+  -Dzookeeper.ssl.keyStore.location=${ZOOKEEPER_SSL_KEYSTORE_LOCATION:-"/opt/bitnami/zookeeper/conf/ssl/zoonavigator.keystore.p12"} \
+  -Dzookeeper.ssl.keyStore.password=${ZOOKEEPER_SSL_KEYSTORE_PASSWORD:-"NeloNELO123456789"} \
+  -Dzookeeper.ssl.trustStore.location=${ZOOKEEPER_SSL_TRUSTSTORE_LOCATION:-"/opt/bitnami/zookeeper/conf/ssl/zoonavigator.truststore.p12"} \
+  -Dzookeeper.ssl.trustStore.password=${ZOOKEEPER_SSL_TRUSTSTORE_PASSWORD:-"NeloNELO123456789"} \
+  -Dzookeeper.ssl.enabledProtocols=${ZOOKEEPER_SSL_ENABLED_PROTOCOLS:-"TLSv1.3"} \
+  -Djavax.net.debug=${JAVAX_NET_DEBUG:-"ssl:handshake:verbose:trustmanager:session:record:certpath:keymanager"} \
+  -Dzookeeper.debug=${ZOOKEEPER_DEBUG:-"true"} \
+  -Djava.net.preferIPv4Stack=${PREFER_IPV4_STACK:-"true"} \
+  -Djava.net.preferIPv6Addresses=${PREFER_IPV6_ADDRESSES:-"false"} \
+  -Dzookeeper.tcpKeepAlive=${ZK_TCP_KEEPALIVE:-"true"} \
+  -Dzookeeper.serverCnxnFactory=${ZK_SERVER_CNXN_FACTORY:-"org.apache.zookeeper.server.NettyServerCnxnFactory"} \
+  -Dzookeeper.serverCnxn.netty.receiveBufferSize=${ZK_SERVER_NETTY_RECEIVE_BUFFER_SIZE:-"3145728"} \
+  -Dzookeeper.serverCnxn.netty.sendBufferSize=${ZK_SERVER_NETTY_SEND_BUFFER_SIZE:-"3145728"} \
+  -Dzookeeper.clientCnxn.netty.receiveBufferSize=${ZK_CLIENT_NETTY_RECEIVE_BUFFER_SIZE:-"3145728"} \
+  -Dzookeeper.clientCnxn.netty.sendBufferSize=${ZK_CLIENT_NETTY_SEND_BUFFER_SIZE:-"3145728"} \
+  -Dzookeeper.quorumCnxn.netty.receiveBufferSize=${ZK_QUORUM_NETTY_RECEIVE_BUFFER_SIZE:-"3145728"} \
+  -Dzookeeper.quorumCnxn.netty.sendBufferSize=${ZK_QUORUM_NETTY_SEND_BUFFER_SIZE:-"3145728"} \
+  -Djavax.net.ssl.keyStoreType=${SSL_KEYSTORE_TYPE:-"PKCS12"} \
+  -Djavax.net.ssl.trustStoreType=${SSL_TRUSTSTORE_TYPE:-"PKCS12"} \
+  -Dsun.security.krb5.rcache=${SUN_SECURITY_KRB5_RCACHE:-"none"} \
+  -Dsun.security.ssl.debug=${SUN_SECURITY_SSL_DEBUG:-"all"} \
+  -Djavax.security.auth.debug=${JAVAX_SECURITY_AUTH_DEBUG:-"all"} \
+  -Djava.security.debug=${JAVA_SECURITY_DEBUG:-"logincontext,configfile,gssloginconfig,accesscontrol,access,failure,configparser,configfileparser"} \
+  -Dsun.security.jgss.useSubjectCredsOnly=${SUN_SECURITY_JGSS_USE_SUBJECT_CREDS_ONLY:-"false"} \
+  -Dsun.security.jgss.native=${SUN_SECURITY_JGSS_NATIVE:-"true"} \
+  -Dio.netty.tryReflectionSetAccessible=${NETTY_REFLECTION_SET_ACCESSIBLE:-"true"} \
+  -Dsun.security.jgss.debug=${SUN_SECURITY_JGSS_DEBUG:-"true"} \
+  -Dsun.security.spnego.debug=${SUN_SECURITY_SPNEGO_DEBUG:-"true"} \
+  -Dsun.security.jgss.krb5.debug=${SUN_SECURITY_JGSS_KRB5_DEBUG:-"true"} \
+  -Dsun.security.krb5.encryption.types=${SUN_SECURITY_KRB5_ENCRYPTION_TYPES:-"aes256-cts-hmac-sha1-96,aes128-cts-hmac-sha1-96,aes256-cts-hmac-sha384-192,aes128-cts-hmac-sha256-128"} \
+  -Djavax.net.ssl.hostnameVerification=${SSL_HOSTNAME_VERIFICATION:-"true"} \
+  -Djava.security.egd=file:/dev/urandom \
+  --add-opens=java.base/java.nio=ALL-UNNAMED \
+  --add-opens=java.base/sun.nio.ch=ALL-UNNAMED \
+  --add-opens=java.management/sun.management=ALL-UNNAMED \
+  --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED \
+  --add-opens=java.base/jdk.internal.ref=ALL-UNNAMED \
+  --add-opens=java.base/jdk.internal.reflect=ALL-UNNAMED \
+  --add-opens=java.base/sun.security.ssl=ALL-UNNAMED \
+  --add-opens=java.base/sun.security.x509=ALL-UNNAMED \
+  --add-opens=java.base/java.lang.invoke=ALL-UNNAMED \
+  --add-opens=java.base/java.lang=ALL-UNNAMED \
+  --add-opens=java.base/java.security=ALL-UNNAMED \
+  --add-opens=java.base/sun.security.util=ALL-UNNAMED \
+  --add-opens=java.base/javax.net.ssl=ALL-UNNAMED \
+  --add-modules=${ADD_MODULES:-"java.security.jgss,java.security.sasl,jdk.security.auth,java.naming"} \
+  -Djdk.tls.server.signatureSchemes=${TLS_SIGNATURE_SCHEMES:-"rsa_pss_rsae_sha256,rsa_pss_rsae_sha384,rsa_pss_rsae_sha512,rsa_pkcs1_sha256,rsa_pkcs1_sha384,rsa_pkcs1_sha512"} \
+  -Djavax.security.auth.message.MessagePolicy.debug=${MSG_POLICY_DEBUG:-"true"} \
+  -Dzookeeper.kerberos.servicePrincipal=${ZOOKEEPER_KERBEROS_SERVICE_PRINCIPAL:-"zoonavigator/zoonavigator@EXAMPLE.COM"} \
+  -Dsun.security.krb5.ktname=${SUN_SECURITY_KRB5_KTNAME:-"/etc/krb5kdc/keytabs/zoonavigator.keytab"}"
+
+# Update Zookeeper JAR to the specified version
+cp /app/extra/${ZOOKEEPER_JAR} /app/lib/${ZOOKEEPER_JAR}
+
+# Generate application configuration by appending zoonavigator.conf.sh
+/app/conf/zoonavigator.conf.sh >> /app/conf/application.conf
+
+# Start the Zoonavigator application with the defined Java options
+exec ./bin/zoonavigator-play ${JAVA_OPTS}

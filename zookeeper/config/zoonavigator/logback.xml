@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Enhanced Logback configuration for Zoonavigator with maximum verbosity.
+  Be cautious: This configuration can generate large log files and may impact performance.
+-->
+
+<configuration>
+
+    <!-- Conversion rule for colored levels -->
+    <conversionRule conversionWord="coloredLevel" converterClass="play.api.libs.logback.ColoredLevel"/>
+
+    <!-- Pattern for detailed logging -->
+    <property name="PATTERN" value="%date [%level] from %logger in %thread - %message%n%xException"/>
+
+    <!-- Rolling File Appender to manage log file sizes -->
+    <appender name="ROLLING_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${application.home:-.}/logs/application.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!-- Rotate daily and keep 30 days' worth of logs -->
+            <fileNamePattern>${application.home:-.}/logs/application.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>3GB</totalSizeCap>
+            <!-- No compression will be used -->
+            <cleanHistoryOnStart>false</cleanHistoryOnStart>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Console Appender with detailed pattern -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%coloredLevel %logger{15} [%thread] - %message%n%xException{10}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Asynchronous File Appender -->
+    <appender name="ASYNCFILE" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="ROLLING_FILE"/>
+        <!-- Optional: Buffer size can be adjusted -->
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+    </appender>
+
+    <!-- Asynchronous Console Appender -->
+    <appender name="ASYNCSTDOUT" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="STDOUT"/>
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock>
+    </appender>
+
+    <!-- Logger for Play Framework components -->
+    <logger name="play" level="DEBUG"/>
+    <logger name="play.api" level="DEBUG"/>
+    <logger name="play.mvc" level="DEBUG"/>
+
+    <!-- Logger for Zoonavigator application -->
+    <logger name="application" level="DEBUG"/>
+    <logger name="com.elkozmon.zoonavigator" level="TRACE"/>
+    <logger name="org.apache.zookeeper" level="TRACE"/>
+    <logger name="akka" level="DEBUG"/>
+    <logger name="play.filters" level="DEBUG"/>
+    <logger name="play.api.libs" level="DEBUG"/>
+
+    <!-- Root Logger set to TRACE for maximum verbosity -->
+    <root level="TRACE">
+        <appender-ref ref="ASYNCFILE"/>
+        <appender-ref ref="ASYNCSTDOUT"/>
+    </root>
+
+</configuration>
