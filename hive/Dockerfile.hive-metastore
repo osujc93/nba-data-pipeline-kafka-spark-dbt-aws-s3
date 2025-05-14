@@ -1,0 +1,80 @@
+FROM apache/hive:4.0.0
+
+USER root
+
+RUN echo "deb http://deb.debian.org/debian bullseye main contrib non-free" > /etc/apt/sources.list.d/bullseye.list \
+ && echo "deb http://deb.debian.org/debian-security bullseye-security main contrib non-free" >> /etc/apt/sources.list.d/bullseye.list \
+ && echo "deb http://deb.debian.org/debian bullseye-updates main contrib non-free" >> /etc/apt/sources.list.d/bullseye.list \
+ && apt-get update \
+ && apt-get install -y \
+    iproute2 \
+    lsof \
+    curl \
+    tar \
+    hostname \
+    net-tools \
+    wget \
+    netcat \
+    postgresql-client \
+ && rm -rf /var/lib/apt/lists/*
+
+# Create log directory
+RUN mkdir -p /opt/hive/logs && chmod 777 /opt/hive/logs
+ENV HIVE_LOG_DIR=/opt/hive/logs
+
+# Remove extra slf4j-reload4j from Hadoop’s lib folder to avoid SLF4J duplicates
+RUN rm -f /opt/hadoop/share/hadoop/common/lib/slf4j-reload4j-*.jar
+RUN rm -f /opt/hive/lib/slf4j-reload4j-*.jar
+
+RUN wget -O /opt/hive/lib/hadoop-aws-3.3.4.jar \
+      "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar" \
+ && wget -O /opt/hive/lib/aws-java-sdk-bundle-1.12.504.jar \
+      "https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.504/aws-java-sdk-bundle-1.12.504.jar" \
+ && wget -O /opt/hive/lib/hadoop-cloud-storage-3.3.4.jar \
+      "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-cloud-storage/3.3.4/hadoop-cloud-storage-3.3.4.jar" \
+ && wget -O /opt/hive/lib/hadoop-client-api-3.3.4.jar \
+      "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-client-api/3.3.4/hadoop-client-api-3.3.4.jar" \
+ && wget -O /opt/hive/lib/hadoop-client-runtime-3.3.4.jar \
+      "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-client-runtime/3.3.4/hadoop-client-runtime-3.3.4.jar" \
+ && wget -O /opt/hive/lib/hadoop-hdfs-client-3.3.4.jar \
+      "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-hdfs-client/3.3.4/hadoop-hdfs-client-3.3.4.jar" \
+ && wget -O /opt/hive/lib/hadoop-hdfs-3.3.4.jar \
+      "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-hdfs/3.3.4/hadoop-hdfs-3.3.4.jar" \
+ && wget -O /opt/hive/lib/hadoop-common-3.3.4.jar \
+      "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-common/3.3.4/hadoop-common-3.3.4.jar"
+
+COPY ./hive/core-site.xml         /opt/hive/conf/core-site.xml
+COPY ./hive/hive-site.xml         /opt/hive/conf/hive-site.xml
+COPY ./hive/metastore-site.xml    /opt/hive/conf/metastore-site.xml
+COPY ./hive/log4j2.properties     /opt/hive/conf/log4j2.properties
+
+ENV HADOOP_CONF_DIR=/opt/hive/conf
+ENV HIVE_CONF_DIR=/opt/hive/conf
+
+COPY ./hive/entrypoint.sh         /entrypoint.sh
+COPY ./hive/validate-config.sh    /opt/hive/conf/validate-config.sh
+RUN chmod +x /opt/hive/conf/validate-config.sh
+
+# Download and place Postgres driver in Hive lib
+RUN wget --retry-connrefused --waitretry=1 --read-timeout=20 --timeout=15 -t 0 -c \
+    https://jdbc.postgresql.org/download/postgresql-42.7.3.jar && \
+    mv postgresql-42.7.3.jar $HIVE_HOME/lib && \
+    test -f $HIVE_HOME/lib/postgresql-42.7.3.jar || { echo "PostgreSQL driver not installed"; exit 1; }
+
+RUN wget --retry-connrefused --waitretry=1 --read-timeout=20 --timeout=15 -t 0 -c \
+    https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-hive-runtime/1.7.1/iceberg-hive-runtime-1.7.1.jar && \
+    mv iceberg-hive-runtime-1.7.1.jar $HIVE_HOME/lib && \
+    test -f $HIVE_HOME/lib/iceberg-hive-runtime-1.7.1.jar || { echo "Iceberg Hive runtime jar not installed"; exit 1; }
+
+# Set environment so official entrypoint uses metastore service
+ENV HIVE_SERVICE=metastore
+
+ENV DB_DRIVER=postgres
+ENV SKIP_SCHEMA_INIT=false
+ENV SERVICE_NAME=metastore
+ENV SERVICE_OPTS="-Xmx1G -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver \
+-Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres:5432/hive \
+-Djavax.jdo.option.ConnectionUserName=nelonba \
+-Djavax.jdo.option.ConnectionPassword=Password123456789"
+
+USER hive

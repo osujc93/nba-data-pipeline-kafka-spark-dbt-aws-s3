@@ -1,0 +1,68 @@
+<configuration>
+
+    <property>
+        <name>fs.s3a.impl</name>
+        <value>org.apache.hadoop.fs.s3a.S3AFileSystem</value>
+    </property>
+
+    <property>
+        <name>fs.s3a.endpoint</name>
+        <value>s3.us-east-2.amazonaws.com</value>
+    </property>
+
+    <property>
+        <name>fs.s3a.aws.region</name>
+        <value>us-east-2</value>
+    </property>
+
+    <property>
+        <name>fs.s3a.path.style.access</name>
+        <value>false</value>
+    </property>
+
+    <property>
+        <name>fs.s3a.connection.ssl.enabled</name>
+        <value>true</value>
+    </property>
+
+    <property>
+        <name>fs.s3a.aws.credentials.provider</name>
+        <value>com.amazonaws.auth.EnvironmentVariableCredentialsProvider</value>
+    </property>
+
+    <property>
+        <name>fs.s3a.fast.upload</name>
+        <value>true</value>
+    </property>
+
+    <property>
+        <name>fs.s3a.buffer.dir</name>
+        <value>/tmp/s3a</value>
+    </property>
+
+    <property>
+        <name>fs.s3a.connection.maximum</name>
+        <value>200</value>
+    </property>
+
+    <property>
+        <name>fs.s3a.threads.max</name>
+        <value>256</value>
+    </property>
+
+    <property>
+        <name>fs.s3a.multipart.size</name>
+        <value>104857600</value>
+    </property>
+
+    <property>
+        <name>fs.s3a.multipart.threshold</name>
+        <value>134217728</value>
+    </property>
+
+    <property>
+        <name>fs.s3a.acl.default</name>
+        <value>BucketOwnerFullControl</value>
+    </property>
+
+</configuration>
