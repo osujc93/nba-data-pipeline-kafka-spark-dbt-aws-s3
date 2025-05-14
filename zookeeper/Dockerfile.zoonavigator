@@ -1,0 +1,41 @@
+FROM elkozmon/zoonavigator:1.1.3
+
+# Switch to root user to install packages
+USER root
+
+# Set the working directory to /app
+WORKDIR /app
+
+# Ensure /var/lib/apt/lists/partial exists with correct permissions
+RUN mkdir -p /var/lib/apt/lists/partial && chmod -R 755 /var/lib/apt/lists
+
+# Update package lists and install wget
+RUN apt-get update && apt-get install -y wget && rm -rf /var/lib/apt/lists/*
+
+# Download Zookeeper 3.9.2 JAR from Maven Central
+RUN wget -O /app/extra/zookeeper-3.9.2.jar https://repo1.maven.org/maven2/org/apache/zookeeper/zookeeper/3.9.2/zookeeper-3.9.2.jar
+
+# Verify the download (optional but recommended)
+RUN ls -l /app/extra/zookeeper-3.9.2.jar
+
+# Remove SLF4J Log4j12 binding
+RUN rm /app/lib/org.slf4j.slf4j-log4j12-1.6.1.jar
+
+ENV SERVER_NAME=zoonavigator
+
+# Copy custom run.sh script
+COPY /zookeeper/zoonavigator/environment.ts.template /app/environment.ts.template
+COPY /zookeeper/zoonavigator/run.sh.template /app/run.sh.template
+COPY /zookeeper/zoonavigator/run.sh /app/run.sh
+COPY /zookeeper/zoonavigator/zoonavigator.conf.sh /app/conf/zoonavigator.conf.sh
+COPY /zookeeper/zoonavigator/application.conf /app/conf/application.conf
+COPY /zookeeper/zoonavigator/logback.xml /app/conf/logback.xml
+
+RUN chmod +x /app/run.sh
+
+# Copy configuration files
+COPY /zookeeper/jaas/zoonavigator/jaas_client.conf /app/jaas_client.conf
+COPY /zookeeper/krb5/1/krb5.conf /etc/krb5.conf
+
+# Set run.sh as the entrypoint
+ENTRYPOINT ["/app/run.sh"]

@@ -1,0 +1,172 @@
+# Master security properties file
+
+# List of security providers and their preference orders
+security.provider.1=SUN
+security.provider.2=SunRsaSign
+security.provider.3=SunEC
+security.provider.4=SunJSSE
+security.provider.5=SunJCE
+security.provider.6=SunJGSS
+security.provider.7=SunSASL
+security.provider.8=XMLDSig
+security.provider.9=SunPCSC
+security.provider.10=JdkLDAP
+security.provider.11=JdkSASL
+security.provider.12=SunPKCS11
+security.provider.13=org.bouncycastle.jce.provider.BouncyCastleProvider
+
+sun.security.ssl.debug=true
+
+sun.security.jgss.mechanism.kerberos=1.2.840.113554.1.2.2
+#sun.security.jgss.mechanism.spnego=1.3.6.1.5.5.2
+java.security.debug=all
+
+# SecureRandom configuration
+securerandom.source=file:/dev/urandom
+securerandom.strongAlgorithms=DRBG:BouncyCastle,NativePRNGNonBlocking:SUN
+
+# DRBG settings for Bouncy Castle
+securerandom.drbg.config=Hash_DRBG,SHA-256,256,none
+
+# Login configuration provider
+login.configuration.provider=sun.security.provider.ConfigFile
+
+# System Policy configuration
+policy.provider=sun.security.provider.PolicyFile
+policy.url.1=file:/usr/lib/jvm/java-17-openjdk-amd64/conf/security/java.policy
+policy.expandProperties=true
+policy.allowSystemProperty=true
+policy.ignoreIdentityScope=false
+
+# Default keystore type and compatibility mode
+keystore.type=pkcs12
+keystore.type.compat=true
+keystore.pkcs12.type=pkcs12
+keystore.jks.type=jks
+keystore.provider=org.bouncycastle.jce.provider.BouncyCastleProvider
+
+# Package access restrictions
+package.access=sun.misc.,\
+               sun.reflect.
+
+# Package definition restrictions
+package.definition=sun.misc.,\
+                   sun.reflect.
+
+# Override properties file setting
+security.overridePropertiesFile=false
+
+# Default key and trust manager factory algorithms
+ssl.KeyManagerFactory.algorithm=SunX509
+ssl.TrustManagerFactory.algorithm=PKIX
+
+# Retains trusted certificates in the validation process. 
+# Ensures that the trusted certificates are preserved and used during certificate path validation.
+sun.security.validator.PKIXValidator.keepTrustedCerts=true
+
+# Enables end-to-end certificate validation.
+# Ensures that certificate chains are fully validated from the root CA to the end-entity certificate.
+sun.security.validator.end2end=true
+
+# Network address cache policy for failed lookups
+networkaddress.cache.ttl=-1
+networkaddress.cache.negative.ttl=10
+
+# Enforce TLSv1.3 for client and server communications
+jdk.tls.client.protocols=TLSv1.2,TLSv1.3
+jdk.tls.server.protocols=TLSv1.2,TLSv1.3
+
+jdk.tls.client.cipherSuites=TLS_AES_256_GCM_SHA384,TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+jdk.tls.server.cipherSuites=TLS_AES_256_GCM_SHA384,TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+
+jdk.tls.client.SignatureSchemes=ecdsa_secp384r1_sha384,ecdsa_secp256r1_sha256,rsa_pss_rsae_sha256,rsa_pss_rsae_sha384,rsa_pss_rsae_sha512,rsa_pkcs1_sha256,rsa_pkcs1_sha384,rsa_pkcs1_sha512
+jdk.tls.server.SignatureSchemes=ecdsa_secp384r1_sha384,ecdsa_secp256r1_sha256,rsa_pss_rsae_sha256,rsa_pss_rsae_sha384,rsa_pss_rsae_sha512,rsa_pkcs1_sha256,rsa_pkcs1_sha384,rsa_pkcs1_sha512
+
+jdk.io.permissionsUseCanonicalPath=false
+
+jdk.security.legacyAlgorithms=SHA1, \
+    RSA keySize < 2048, DSA keySize < 2048
+
+jdk.jar.disabledAlgorithms=MD2, MD5, RSA keySize < 1024, \
+      DSA keySize < 1024, SHA1 denyAfter 2019-01-01
+
+# Disable older TLS versions to ensure only TLSv1.3 is used
+jdk.tls.disabledAlgorithms=SSLv3, TLSv1, TLSv1.1, DTLSv1.0, RC4, DES, \
+    MD5withRSA, DH keySize < 1024, 3DES_EDE_CBC, \
+    anon, NULL
+
+# TLS key limits for symmetric cryptographic algorithms
+jdk.tls.keyLimits=AES/GCM/NoPadding KeyUpdate 2^37, \
+                  ChaCha20-Poly1305 KeyUpdate 2^37
+
+# Define legacy algorithms
+jdk.tls.legacyAlgorithms=NULL, anon, RC4, DES, 3DES_EDE_CBC
+
+#jdk.sasl.disabledMechanisms=
+
+# Define supported named groups for TLS key exchange
+jdk.tls.namedGroups=secp256r1,secp384r1,secp521r1,ffdhe2048,ffdhe3072,ffdhe4096,ffdhe6144,ffdhe8192,x25519
+
+# Set unlimited cryptographic policy
+crypto.policy=unlimited
+
+# Increase key size constraints for stronger security
+jdk.certpath.disabledAlgorithms=MD2, MD5, SHA1 jdkCA & usage TLSServer, \
+    SHA1 usage SignedJAR & denyAfter 2019-01-01, \
+    RSA keySize < 2048, DSA keySize < 2048
+
+# JAR file algorithm restrictions
+jdk.jar.disabledAlgorithms=MD2, MD5, RSA keySize < 2048, \
+    DSA keySize < 2048, SHA1 denyAfter 2019-01-01
+
+# Kerberos-specific encryption types
+sun.security.krb5.encryption.types=aes256-cts-hmac-sha1-96,aes128-cts-hmac-sha1-96,aes256-cts-hmac-sha384-192,aes128-cts-hmac-sha256-128
+
+# Disable Kerberos referrals
+sun.security.krb5.disableReferrals=true
+
+# KDC retry configuration for high availability
+sun.security.krb5.kdcRetries=3
+sun.security.krb5.kdcTimeout=7000
+
+# Use native GSS libraries
+sun.security.jgss.native=true
+sun.security.jgss.lib=/usr/lib/libgssapi_krb5.so.2.2
+
+# Configure maximum GSSAPI token size
+sun.security.jgss.maxTokenSize=5242880
+
+# javax security auth settings
+javax.security.auth.useSubjectCredsOnly=false
+
+# Set the default ALPN character set
+jdk.tls.alpnCharset=ISO_8859_1
+
+login.config.url.1=file:/conf/jaas_server.conf
+login.config.url.2=file:/conf/jaas_client.conf
+
+sun.security.krb5.principal.name.format=KRB5_NT_PRINCIPAL
+
+java.security.krb5.realm=NELO.COM
+java.security.krb5.kdc=krb5-kdc-server-nelo-com
+
+# Enable support for session tickets and session resumption
+jdk.tls.server.enableSessionTicketExtension=true
+
+# Enable extended master secret for better security
+jdk.tls.extendedMasterSecret=true
+
+# Add server certificate authorities and pre-shared key support
+jdk.tls.server.certificateAuthorities.enabled=true
+jdk.tls.preSharedKey.extensions=true
+
+# Enable the max fragment length extension
+jdk.tls.maxFragmentLength=4096
+
+# Allow renegotiation support (if explicitly required for compatibility)
+sun.security.ssl.allowUnsafeRenegotiation=false
+
+jdk.tls.client.enableStatusRequestExtension=true
+jdk.tls.client.enableStatusRequestV2Extension=true
+
+javax.net.debug=ssl,handshake
