@@ -1,0 +1,53 @@
+# File: Dockerfile.trino
+
+FROM openjdk:22-slim
+
+ENV TRINO_VERSION=448
+
+# Install necessary dependencies
+RUN apt-get update && apt-get install -y \
+    wget \
+    gnupg2 \
+    python3 \
+    python3-venv \
+    python3-pip \
+    less \
+    && apt-get clean
+
+# Symlink 'python' -> 'python3'
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
+ENV JAVA_HOME=/usr/lib/jvm/java-22-openjdk
+ENV PATH=$JAVA_HOME/bin:$PATH
+
+# Download Trino
+RUN wget https://repo1.maven.org/maven2/io/trino/trino-server/${TRINO_VERSION}/trino-server-${TRINO_VERSION}.tar.gz && \
+    tar -xzf trino-server-${TRINO_VERSION}.tar.gz && \
+    mv trino-server-${TRINO_VERSION} /opt/trino && \
+    rm trino-server-${TRINO_VERSION}.tar.gz
+
+RUN wget https://repo1.maven.org/maven2/io/trino/trino-cli/${TRINO_VERSION}/trino-cli-${TRINO_VERSION}-executable.jar \
+         -O /usr/local/bin/trino && \
+    chmod +x /usr/local/bin/trino
+
+# Create trino user/group
+RUN groupadd -r trino && useradd -r -g trino -d /home/trino -m trino
+
+COPY trino/etc/config.properties /opt/trino/etc/config.properties
+COPY trino/etc/jvm.config    /opt/trino/etc/jvm.config
+COPY trino/etc/node.properties /opt/trino/etc/node.properties
+
+# Make a data dir for the Trino user
+RUN mkdir -p /var/lib/trino/data && chown -R trino:trino /var/lib/trino
+
+RUN chown -R trino:trino /home/trino && chmod 755 /home/trino
+
+# Set up environment
+ENV TRINO_HOME=/opt/trino
+ENV PATH=$TRINO_HOME/bin:$PATH
+
+# Switch to the trino user
+USER trino
+
+# Run Trino
+CMD ["/opt/trino/bin/launcher", "run"]
