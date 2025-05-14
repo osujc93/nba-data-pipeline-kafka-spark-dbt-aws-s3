@@ -1,0 +1,1300 @@
+x-airflow-common: &airflow-common
+  build:
+    context: .
+    dockerfile: ./airflow/Dockerfile.airflow2
+  env_file:
+    - ./.env
+  environment:
+    &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: CeleryExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
+    AIRFLOW__CORE__FERNET_KEY: 'HPqWFGaV0SS7c8c9oyfTBeZuJNR7TYgQGcqZTe0RHk0='
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
+    AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
+    WEB_SERVER_WORKER_TIMEOUT: 600
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}  
+    DOCKER_API_VERSION: '1.41'
+    DOCKER_HOST: 'unix:///var/run/docker.sock'      
+    AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+    AWS_REGION: ${AWS_REGION}
+    S3_ENDPOINT: ${S3_ENDPOINT}
+    S3_BUCKET: ${S3_BUCKET}
+    TZ: 'America/New_York'
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: 'America/New_York'
+    AIRFLOW__WEBSERVER__DEFAULT_UI_TIMEZONE: 'America/New_York'
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - /var/run/docker.sock:/var/run/docker.sock
+    - airflow-logs:/opt/airflow/logs
+  depends_on:
+    &airflow-common-depends-on
+    redis:
+      condition: service_healthy
+    postgres:
+      condition: service_healthy
+    kafka1:
+      condition: service_started
+    zookeeper1:
+      condition: service_healthy
+
+x-extra-hosts: &shared-hosts
+  - "redis:172.20.10.8"
+  - "postgres:172.20.10.9"
+  - "kafka1:172.20.10.1"
+  - "kafka2:172.20.10.2"
+  - "kafka3:172.20.10.3"
+  - "kafka4:172.20.10.4"
+  - "kafka-ui:172.20.10.5"
+  - "airflow-webserver:172.20.10.10"
+  - "airflow-scheduler:172.20.10.11"
+  - "airflow-worker:172.20.10.12"
+  - "airflow-triggerer:172.20.10.13"
+  - "airflow-init:172.20.10.14"
+  - "airflow-cli:172.20.10.15"
+  - "flower:172.20.10.16"
+  - "spark-master1:172.20.10.40"
+  - "spark-master2:172.20.10.41"
+  - "spark-master3:172.20.10.42"
+  - "spark-worker1:172.20.10.43"
+  - "spark-worker2:172.20.10.44"
+  - "spark-worker3:172.20.10.45"
+  - "spark-client:172.20.10.46"
+  - "spark-history:172.20.10.23"
+  - "trino:172.20.10.24"
+  - "mlflow:172.20.10.29"
+  - "superset:172.20.10.30"
+  - "zookeeper1:172.20.10.71"
+  - "zookeeper2:172.20.10.72"
+  - "zookeeper3:172.20.10.73"
+  - "zookeeper4:172.20.10.74"
+  - "zookeeper5:172.20.10.75"
+  - "spark-jupyter:172.20.10.85"
+  - "hive-metastore:172.20.10.33"
+
+services:
+  redis:
+    image: redis:7.2-bookworm
+    container_name: redis
+    expose:
+      - 6379
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 30s
+      retries: 50
+      start_period: 30s
+    restart: always
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.8
+    depends_on:
+      postgres:
+        condition: service_healthy  
+    volumes:
+      - redis-data:/data
+
+  postgres:
+    build:
+      context: .
+      dockerfile: ./postgres/Dockerfile.postgres 
+    container_name: postgres
+    hostname: postgres    
+    command: >
+      postgres
+      -c max_connections=300
+      -c shared_buffers=256MB
+      -c maintenance_work_mem=512MB
+      -c authentication_timeout=2min
+      -c autovacuum_max_workers=10
+      -c autovacuum_naptime=10s
+      -c autovacuum_vacuum_cost_delay=0
+      -c autovacuum_vacuum_cost_limit=2000
+    ports:
+      - "5432:5432"
+    env_file:
+      - ./.env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}     
+      POSTGRES_PORT: ${POSTGRES_PORT}     
+      POSTGRES_HOST: ${POSTGRES_HOST}  
+      POSTGRES_ROLE: ${POSTGRES_ROLE}        
+      DOCKER_API_VERSION: '1.41'              
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init-postgres.sh:/docker-entrypoint-initdb.d/init-postgres.sh
+      - ./.env:/docker-entrypoint-initdb.d/.env      
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.9
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 30s
+      timeout: 10s
+      retries: 1
+
+  kafka1:
+    build:
+      context: .
+      dockerfile: ./Kafka-kRaft-Cluster/kafka/config/Dockerfile.kafka1
+    container_name: kafka1
+    hostname: kafka1    
+    ports:
+      - "9091:9091"
+      - "7001:7001"
+      - "9001:9001"
+      - "9002:9002"
+      - "9003:9003"
+    volumes:
+      - kafka1_data:/var/lib/kafka/data1 
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.1
+    environment:
+      KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+ExplicitGCInvokesConcurrent -XX:MaxInlineLevel=15 -Djava.awt.headless=true"
+      LOG_DIR: "/var/log/kafka"
+      KAFKA_LOG4J_OPTS: "-Dlog4j.configuration=file:/opt/kafka/config/log4j.properties -Dkafka.logs.dir=/var/log/kafka"
+      KAFKA_GC_LOG_OPTS: "-Xlog:gc*:file=/var/log/kafka/gc.log:time,tags:filecount=10,filesize=100M"
+      JAVA_DEBUG_PORT: "5005"
+      JAVA_DEBUG_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"    
+      KAFKA_HEAP_OPTS: "-Xms2G -Xmx2G -XX:+UseG1GC"
+      KAFKA_CLUSTER_ID: 123e4567-e89b-12d3-a456-426614174001
+      KAFKA_OPTS: |
+        -Djava.security.properties=/usr/lib/jvm/java-17-openjdk/conf/security/java.security
+        -Djava.security.policy=/usr/lib/jvm/java-17-openjdk/conf/security/java.policy
+        -Dlog4j.configuration=file:/opt/kafka/config/log4j.properties
+        -Djava.net.debug=all     
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+    healthcheck:
+      test: ["CMD", "/opt/kafka/config/healthcheck.sh"]
+      interval: 190s
+      timeout: 60s
+      retries: 2
+      start_period: 290s
+    extra_hosts: *shared-hosts
+
+  kafka2:
+    build:
+      context: .
+      dockerfile: ./Kafka-kRaft-Cluster/kafka/config/Dockerfile.kafka2
+    container_name: kafka2
+    hostname: kafka2    
+    ports:
+      - "9092:9092"
+      - "7002:7002"
+      - "9004:9004"
+      - "9005:9005"
+      - "9006:9006"
+    volumes:
+      - kafka2_data:/var/lib/kafka/data2
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.2
+    environment:
+      KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+ExplicitGCInvokesConcurrent -XX:MaxInlineLevel=15 -Djava.awt.headless=true"
+      LOG_DIR: "/var/log/kafka"
+      KAFKA_LOG4J_OPTS: "-Dlog4j.configuration=file:/opt/kafka/config/log4j.properties -Dkafka.logs.dir=/var/log/kafka"
+      KAFKA_GC_LOG_OPTS: "-Xlog:gc*:file=/var/log/kafka/gc.log:time,tags:filecount=10,filesize=100M"
+      JAVA_DEBUG_PORT: "5005"
+      JAVA_DEBUG_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"    
+      KAFKA_HEAP_OPTS: "-Xms2G -Xmx2G -XX:+UseG1GC"
+      KAFKA_CLUSTER_ID: 123e4567-e89b-12d3-a456-426614174001
+      KAFKA_OPTS: |
+        -Djava.security.properties=/usr/lib/jvm/java-17-openjdk/conf/security/java.security
+        -Djava.security.policy=/usr/lib/jvm/java-17-openjdk/conf/security/java.policy
+        -Dlog4j.configuration=file:/opt/kafka/config/log4j.properties
+        -Djava.net.debug=all           
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+    healthcheck:
+      test: ["CMD", "/opt/kafka/config/healthcheck.sh"]
+      interval: 190s
+      timeout: 60s
+      retries: 2
+      start_period: 290s 
+    extra_hosts: *shared-hosts
+
+  kafka3:
+    build:
+      context: .
+      dockerfile: ./Kafka-kRaft-Cluster/kafka/config/Dockerfile.kafka3
+    container_name: kafka3
+    hostname: kafka3    
+    ports:
+      - "9093:9093"
+      - "7003:7003"
+      - "9007:9007"
+      - "9008:9008"
+      - "9009:9009"
+    volumes:
+      - kafka3_data:/var/lib/kafka/data3
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.3
+    environment:
+      KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+ExplicitGCInvokesConcurrent -XX:MaxInlineLevel=15 -Djava.awt.headless=true"
+      LOG_DIR: "/var/log/kafka"
+      KAFKA_LOG4J_OPTS: "-Dlog4j.configuration=file:/opt/kafka/config/log4j.properties -Dkafka.logs.dir=/var/log/kafka"
+      KAFKA_GC_LOG_OPTS: "-Xlog:gc*:file=/var/log/kafka/gc.log:time,tags:filecount=10,filesize=100M"
+      JAVA_DEBUG_PORT: "5005"
+      JAVA_DEBUG_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"    
+      KAFKA_HEAP_OPTS: "-Xms2G -Xmx2G -XX:+UseG1GC"
+      KAFKA_CLUSTER_ID: 123e4567-e89b-12d3-a456-426614174001
+      KAFKA_OPTS: |
+        -Djava.security.properties=/usr/lib/jvm/java-17-openjdk/conf/security/java.security
+        -Djava.security.policy=/usr/lib/jvm/java-17-openjdk/conf/security/java.policy
+        -Dlog4j.configuration=file:/opt/kafka/config/log4j.properties
+        -Djava.net.debug=all           
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+    healthcheck:
+      test: ["CMD", "/opt/kafka/config/healthcheck.sh"]
+      interval: 190s
+      timeout: 60s
+      retries: 2
+      start_period: 290s  
+    extra_hosts: *shared-hosts
+
+  kafka4:
+    build:
+      context: .
+      dockerfile: ./Kafka-kRaft-Cluster/kafka/config/Dockerfile.kafka4
+    container_name: kafka4
+    hostname: kafka4    
+    ports:
+      - "9094:9094"
+      - "7004:7004"
+      - "9010:9010"
+      - "9011:9011"
+      - "9012:9012"
+    volumes:
+      - kafka4_data:/var/lib/kafka/data4
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.4
+    environment:
+      KAFKA_JVM_PERFORMANCE_OPTS: "-server -XX:+UseG1GC -XX:MaxGCPauseMillis=20 -XX:InitiatingHeapOccupancyPercent=35 -XX:+ExplicitGCInvokesConcurrent -XX:MaxInlineLevel=15 -Djava.awt.headless=true"
+      LOG_DIR: "/var/log/kafka"
+      KAFKA_LOG4J_OPTS: "-Dlog4j.configuration=file:/opt/kafka/config/log4j.properties -Dkafka.logs.dir=/var/log/kafka"
+      KAFKA_GC_LOG_OPTS: "-Xlog:gc*:file=/var/log/kafka/gc.log:time,tags:filecount=10,filesize=100M"
+      JAVA_DEBUG_PORT: "5005"
+      JAVA_DEBUG_OPTS: "-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=5005"    
+      KAFKA_HEAP_OPTS: "-Xms2G -Xmx2G -XX:+UseG1GC"
+      KAFKA_CLUSTER_ID: 123e4567-e89b-12d3-a456-426614174001
+      KAFKA_OPTS: |
+        -Djava.security.properties=/usr/lib/jvm/java-17-openjdk/conf/security/java.security
+        -Djava.security.policy=/usr/lib/jvm/java-17-openjdk/conf/security/java.policy
+        -Dlog4j.configuration=file:/opt/kafka/config/log4j.properties
+        -Djava.net.debug=all           
+        -Dcom.sun.management.jmxremote.authenticate=false
+        -Dcom.sun.management.jmxremote.ssl=false
+    healthcheck:
+      test: ["CMD", "/opt/kafka/config/healthcheck.sh"]
+      interval: 190s
+      timeout: 60s
+      retries: 4
+      start_period: 290s  
+    extra_hosts: *shared-hosts
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    ports:
+      - "8084:8080"
+    depends_on:
+      kafka1:
+        condition: service_started
+      kafka2:
+        condition: service_started
+      kafka3:
+        condition: service_started
+      kafka4:
+        condition: service_started
+    environment:
+      LOGGING_CONFIG: /etc/kafka-ui/logback.xml
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS: "kafka1:9091,kafka2:9092,kafka3:9093,kafka4:9094"
+      KAFKA_CLUSTERS_0_SECURITY_PROTOCOL: PLAINTEXT
+    volumes:
+      - kafka-ui_data:/var/lib/kafka-ui/data
+      - ./Kafka-kRaft-Cluster/kafka/config/properties/logging/logback.xml:/etc/kafka-ui/logback.xml
+      - ./Kafka-kRaft-Cluster/kafka/config/logs:/var/lib/kafka-ui/logs
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.5
+  airflow-base:
+    container_name: airflow-base
+    build:
+      context: .
+      dockerfile: ./airflow/Dockerfile.airflow-base
+    image: airflow-base:latest
+    command: tail -f /dev/null
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: bash -c "airflow webserver"
+    container_name: airflow-webserver
+    user: "airflow"
+    group_add:
+      - "docker"
+    environment:
+      <<: *airflow-common-env
+      AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG
+      AIRFLOW__LOGGING__CELERY_LOGGING_LEVEL: DEBUG
+      AIRFLOW__LOGGING__FAB_LOGGING_LEVEL: DEBUG
+      FLASK_LIMITER_STORAGE_URL: redis://:@redis:6379/0
+      AIRFLOW__CORE__FERNET_KEY: HPqWFGaV0SS7c8c9oyfTBeZuJNR7TYgQGcqZTe0RHk0=
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+      AIRFLOW__CORE__HOSTNAME_CALLABLE: 'socket.gethostname'
+      AIRFLOW__PROVIDERS__DOCKER__DOCKEROPERATORMOUNT_TMP_DIR: "False"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow      
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD}
+      WEB_SERVER_WORKER_TIMEOUT: 300  
+      DBT_PROFILES_DIR: /dbt  
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+    ports:
+      - "8082:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 10
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka1:
+        condition: service_started
+      zookeeper1:
+        condition: service_healthy  
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.10
+    extra_hosts: *shared-hosts
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
+      - airflow-logs:/opt/airflow/logs
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: bash -c "airflow scheduler"
+    container_name: airflow-scheduler
+    user: "airflow"
+    group_add:
+      - "docker"
+    environment:
+      <<: *airflow-common-env
+      AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka1:
+        condition: service_started
+      zookeeper1:
+        condition: service_healthy  
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.11
+    extra_hosts: *shared-hosts
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
+      - airflow-logs:/opt/airflow/logs
+
+  airflow-worker:
+    <<: *airflow-common
+    command: bash -c "airflow celery worker"
+    container_name: airflow-worker
+    user: "airflow"
+    group_add:
+      - "docker"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"'
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    environment:
+      <<: *airflow-common-env
+      DUMB_INIT_SETSID: "0"
+      AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG
+      AIRFLOW__LOGGING__CELERY_LOGGING_LEVEL: DEBUG  
+      AIRFLOW__CORE__HOSTNAME_CALLABLE: 'socket.gethostname'
+      DBT_PROFILES_DIR: /dbt  
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka1:
+        condition: service_started
+      zookeeper1:
+        condition: service_healthy   
+    ports:
+      - "8793:8793"
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.12
+    extra_hosts: *shared-hosts
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
+      - airflow-logs:/opt/airflow/logs
+
+  airflow-triggerer:
+    <<: *airflow-common
+    command: bash -c "airflow triggerer"
+    container_name: airflow-triggerer
+    user: "airflow"
+    group_add:
+      - "docker"
+    healthcheck:
+      test: ["CMD-SHELL", 'airflow jobs check --job-type TriggererJob --hostname "$${HOSTNAME}"']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy   
+      kafka1:
+        condition: service_started
+      zookeeper1:
+        condition: service_healthy  
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.13
+    extra_hosts: *shared-hosts
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
+      - airflow-logs:/opt/airflow/logs
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: airflow-init
+    entrypoint: /bin/bash
+    user: "airflow"
+    group_add:
+      - "docker"
+    command:
+      - -c
+      - |
+        mkdir -p /sources/logs /sources/dags /sources/plugins
+        airflow db migrate
+        airflow users create --username ${_AIRFLOW_WWW_USER_USERNAME} --password ${_AIRFLOW_WWW_USER_PASSWORD} --firstname Admin --lastname User --role Admin --email admin@example.com
+    environment:
+      <<: *airflow-common-env
+      AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG
+      AIRFLOW__LOGGING__CELERY_LOGGING_LEVEL: DEBUG
+      _AIRFLOW_DB_MIGRATE: 'true'
+      _AIRFLOW_WWW_USER_CREATE: 'true'
+      _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME}
+      _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD}
+      _PIP_ADDITIONAL_REQUIREMENTS: ''
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+    depends_on:
+      <<: *airflow-common-depends-on
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka1:
+        condition: service_started
+      zookeeper1:
+        condition: service_healthy  
+    volumes:
+      - .:/sources
+      - ./dags:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
+      - airflow-logs:/opt/airflow/logs
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.14
+    extra_hosts: *shared-hosts
+
+  airflow-cli:
+    <<: *airflow-common
+    container_name: airflow-cli
+    user: "airflow"
+    group_add:
+      - "docker"
+    profiles:
+      - debug
+    environment:
+      <<: *airflow-common-env
+      CONNECTION_CHECK_MAX_COUNT: "0"
+      AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG
+      AIRFLOW__LOGGING__CELERY_LOGGING_LEVEL: DEBUG
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+    depends_on:
+      <<: *airflow-common-depends-on
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    entrypoint: ["tail", "-f", "/dev/null"]
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.15
+    extra_hosts: *shared-hosts
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
+      - airflow-logs:/opt/airflow/logs
+
+  airflow-exporter:
+    <<: *airflow-common
+    container_name: airflow-exporter
+    command: bash -c "airflow-prometheus-exporter --port 8799"
+    user: "airflow"
+    group_add:
+      - "docker"
+    environment:
+      <<: *airflow-common-env
+    ports:
+      - "8799:8799"
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.25
+    depends_on:
+      - airflow-webserver
+      - airflow-scheduler
+      - airflow-worker
+
+  flower:
+    <<: *airflow-common
+    command: bash -c "airflow celery flower"
+    container_name: flower
+    user: "airflow"
+    group_add:
+      - "docker"
+    profiles:
+      - flower
+    ports:
+      - "5556:5555"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:5555/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy      
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.16
+
+  spark-base:
+    container_name: spark-base
+    build:
+      context: .
+      dockerfile: ./Spark-Cluster/Dockerfile.spark-base
+    image: spark-base:latest
+    command: tail -f /dev/null
+
+  spark-client:
+    build:
+      context: .
+      dockerfile: ./Spark-Cluster/Dockerfile.spark-client
+    image: spark-client:latest
+    container_name: spark-client
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.46
+    extra_hosts: *shared-hosts
+    depends_on:
+      spark-master1:
+        condition: service_started
+
+  spark-master1:
+    container_name: spark-master1
+    build:
+      context: .
+      dockerfile: ./Spark-Cluster/Dockerfile.spark-master
+    image: spark-master:latest
+    hostname: spark-master1
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.40
+    environment:
+      SPARK_MASTER_HOST: spark-master1
+      SPARK_MASTER_PORT: 7077
+      SPARK_MASTER_WEBUI_PORT: 8080
+      SPARK_RECOVERY_MODE: ZOOKEEPER
+      SPARK_ZOOKEEPER_URL: "zookeeper1:2181,zookeeper2:2181,zookeeper3:2181"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+    mem_limit: 3g
+    depends_on:
+      zookeeper1:
+        condition: service_healthy
+      zookeeper2:
+        condition: service_healthy
+      zookeeper3:
+        condition: service_healthy
+      zookeeper4:
+        condition: service_healthy  
+      zookeeper5:
+        condition: service_healthy 
+    ports:
+      - "7077:7077"
+      - "9080:8080"
+    extra_hosts: *shared-hosts
+
+  spark-master2:
+    container_name: spark-master2
+    build:
+      context: .
+      dockerfile: ./Spark-Cluster/Dockerfile.spark-master
+    image: spark-master:latest
+    hostname: spark-master2
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.41
+    environment:
+      SPARK_MASTER_HOST: spark-master2
+      SPARK_MASTER_PORT: 7077
+      SPARK_MASTER_WEBUI_PORT: 8080
+      SPARK_RECOVERY_MODE: ZOOKEEPER
+      SPARK_ZOOKEEPER_URL: "zookeeper1:2181,zookeeper2:2181,zookeeper3:2181"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+    mem_limit: 3g
+    depends_on:
+      zookeeper1:
+        condition: service_healthy
+      zookeeper2:
+        condition: service_healthy
+      zookeeper3:
+        condition: service_healthy
+      zookeeper4:
+        condition: service_healthy  
+      zookeeper5:
+        condition: service_healthy 
+    ports:
+      - "7078:7077"
+      - "9081:8080"
+    extra_hosts: *shared-hosts
+
+  spark-master3:
+    container_name: spark-master3
+    build:
+      context: .
+      dockerfile: ./Spark-Cluster/Dockerfile.spark-master
+    image: spark-master:latest
+    hostname: spark-master3
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.42
+    environment:
+      SPARK_MASTER_HOST: spark-master3
+      SPARK_MASTER_PORT: 7077
+      SPARK_MASTER_WEBUI_PORT: 8080
+      SPARK_RECOVERY_MODE: ZOOKEEPER
+      SPARK_ZOOKEEPER_URL: "zookeeper1:2181,zookeeper2:2181,zookeeper3:2181"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+    mem_limit: 3g
+    depends_on:
+      zookeeper1:
+        condition: service_healthy
+      zookeeper2:
+        condition: service_healthy
+      zookeeper3:
+        condition: service_healthy
+      zookeeper4:
+        condition: service_healthy  
+      zookeeper5:
+        condition: service_healthy 
+    ports:
+      - "7079:7077"
+      - "9082:8080"
+    extra_hosts: *shared-hosts
+
+  spark-worker1:
+    container_name: spark-worker1
+    build:
+      context: .
+      dockerfile: ./Spark-Cluster/Dockerfile.spark-worker
+    image: spark-worker:latest
+    hostname: spark-worker1
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.43
+    environment:
+      SPARK_MASTER: "spark://spark-master1:7077,spark-master2:7077,spark-master3:7077"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+      SPARK_SHUFFLE_SERVICE_ENABLED: "false"
+    mem_limit: 6g
+    depends_on:
+      zookeeper1:
+        condition: service_healthy
+      zookeeper2:
+        condition: service_healthy
+      zookeeper3:
+        condition: service_healthy
+      zookeeper4:
+        condition: service_healthy  
+      zookeeper5:
+        condition: service_healthy 
+    ports:
+      - "8090:8090"
+    extra_hosts: *shared-hosts
+
+  spark-worker2:
+    container_name: spark-worker2
+    build:
+      context: .
+      dockerfile: ./Spark-Cluster/Dockerfile.spark-worker
+    image: spark-worker:latest
+    hostname: spark-worker2
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.44
+    environment:
+      SPARK_MASTER: "spark://spark-master1:7077,spark-master2:7077,spark-master3:7077"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+      SPARK_SHUFFLE_SERVICE_ENABLED: "false"
+    mem_limit: 6g
+    depends_on:
+      zookeeper1:
+        condition: service_healthy
+      zookeeper2:
+        condition: service_healthy
+      zookeeper3:
+        condition: service_healthy
+      zookeeper4:
+        condition: service_healthy  
+      zookeeper5:
+        condition: service_healthy 
+    ports:
+      - "8091:8090"
+    extra_hosts: *shared-hosts
+
+  spark-worker3:
+    container_name: spark-worker3
+    build:
+      context: .
+      dockerfile: ./Spark-Cluster/Dockerfile.spark-worker
+    image: spark-worker:latest
+    hostname: spark-worker3
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.45
+    environment:
+      SPARK_MASTER: "spark://spark-master1:7077,spark-master2:7077,spark-master3:7077"
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+      SPARK_SHUFFLE_SERVICE_ENABLED: "false"
+    mem_limit: 6g
+    depends_on:
+      zookeeper1:
+        condition: service_healthy
+      zookeeper2:
+        condition: service_healthy
+      zookeeper3:
+        condition: service_healthy
+      zookeeper4:
+        condition: service_healthy  
+      zookeeper5:
+        condition: service_healthy 
+    ports:
+      - "8092:8090"
+    extra_hosts: *shared-hosts
+
+  spark-history:
+    build:
+      context: .
+      dockerfile: ./Spark-Cluster/Dockerfile.spark-history
+    container_name: spark-history
+    image: spark-history:latest
+    ports:
+      - "18080:18080"
+    environment:
+      JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64   
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.23
+    depends_on:
+      zookeeper1:
+        condition: service_healthy
+      zookeeper2:
+        condition: service_healthy
+      zookeeper3:
+        condition: service_healthy
+      zookeeper4:
+        condition: service_healthy  
+      zookeeper5:
+        condition: service_healthy  
+    cap_add:
+      - NET_ADMIN
+      
+  trino:
+    container_name: trino
+    restart: always
+    build:
+      context: .
+      dockerfile: ./trino/Dockerfile.trino
+    ports:
+      - "8085:8085"
+    environment:
+      JAVA_OPTS: "-Dconfig=/opt/trino/etc/config.properties"
+      TRINO_JDBC_URL: "jdbc:postgresql://postgres:5432/trino"
+      TRINO_JDBC_USER: "${POSTGRES_USER}"
+      TRINO_JDBC_PASSWORD: "${POSTGRES_PASSWORD}"
+      TRINO_JDBC_ROLE: "${POSTGRES_ROLE}"   
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+    env_file:
+      - ./.env
+    volumes:
+      - ./trino/etc:/opt/trino/etc:ro
+      - trino_data:/var/lib/trino/data
+      - ./trino/etc/catalog/iceberg.properties:/opt/trino/etc/catalog/iceberg.properties:ro
+      - ./trino/etc/catalog/hive.properties:/opt/trino/etc/catalog/hive.properties:ro
+
+    command: >
+      /bin/bash -c "mkdir -p /var/lib/trino/data &&
+                   chown -R trino:trino /var/lib/trino &&
+                   /opt/trino/bin/launcher run"
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.24
+    depends_on:
+      zookeeper1:
+        condition: service_healthy
+      zookeeper2:
+        condition: service_healthy
+      zookeeper3:
+        condition: service_healthy
+      zookeeper4:
+        condition: service_healthy  
+      zookeeper5:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy 
+      hive-metastore:
+        condition: service_healthy 
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: ./mlflow/Dockerfile.mlflow
+    container_name: mlflow
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./.env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_ROLE: ${POSTGRES_ROLE}
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_ARTIFACT_ROOT: /mlflow/artifacts
+      MLFLOW_BACKEND_STORE_URI: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/mlflow
+      MLFLOW_DB_ROLE: ${POSTGRES_ROLE}
+      MLFLOW_ENABLE_SYSTEM_METRICS_LOGGING: "true"
+      MLFLOW_SYSTEM_METRICS_SAMPLING_INTERVAL: "5"
+      MLFLOW_SYSTEM_METRICS_SAMPLES_BEFORE_LOGGING: "2"
+    volumes:
+      - ./mlflow:/mlflow
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.29
+    depends_on:
+      postgres:
+        condition: service_healthy 
+
+  superset:
+    build:
+      context: .
+      dockerfile: ./superset/Dockerfile.superset
+    container_name: superset
+    image: superset:latest
+    ports:
+      - "8098:8098"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - POSTGRES_SUPERSET_DB=${POSTGRES_SUPERSET_DB}
+      - POSTGRES_ROLE=${POSTGRES_ROLE}
+      - SUPERSET_CONFIG_PATH=/app/config/superset_config.py
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_FIRSTNAME=${ADMIN_FIRSTNAME}
+      - ADMIN_LASTNAME=${ADMIN_LASTNAME}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - SUPERSET_SECRET_KEY=${SUPERSET_SECRET_KEY}
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.30
+    depends_on:
+      zookeeper1:
+        condition: service_healthy
+      zookeeper2:
+        condition: service_healthy
+      zookeeper3:
+        condition: service_healthy
+      zookeeper4:
+        condition: service_healthy  
+      zookeeper5:
+        condition: service_healthy 
+      postgres:
+        condition: service_healthy
+ 
+  zookeeper1:
+    build:
+      context: .
+      dockerfile: ./zookeeper/config/Dockerfile.zookeeper1
+    container_name: zookeeper1
+    hostname: zookeeper1
+    ports:
+      - "2222:22"
+      - "7011:7011"    
+      - "2181:2181"
+      - "2888:2888"
+      - "3888:3888"
+    environment:
+      ZOO_MY_ID: 1   
+      ZOO_SERVERS: server.1=zookeeper1:2888:3888;server.2=zookeeper2:2888:3888;server.3=zookeeper3:2888:3888,server.4=zookeeper4:2888:3888:observer,server.5=zookeeper5:2888:3888:observer
+      ZOO_DATA_DIR: /data
+    volumes:
+      - zk1_data:/data 
+    healthcheck:
+      test: ["CMD", "/opt/healthcheck-tls.sh"]
+      interval: 60s
+      timeout: 60s
+      retries: 5
+      start_period: 230s    
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.71
+    cap_add:
+      - SYS_TIME
+    extra_hosts: *shared-hosts
+
+  zookeeper2:
+    build:
+      context: .
+      dockerfile: ./zookeeper/config/Dockerfile.zookeeper2
+    container_name: zookeeper2
+    hostname: zookeeper2
+    ports:
+      - "2223:22"          
+      - "7012:7012"     
+      - "2182:2181"
+      - "2889:2888"
+      - "3889:3888"
+    environment:
+      ZOO_MY_ID: 2      
+      ZOO_SERVERS: server.1=zookeeper1:2888:3888;server.2=zookeeper2:2888:3888;server.3=zookeeper3:2888:3888,server.4=zookeeper4:2888:3888:observer,server.5=zookeeper5:2888:3888:observer
+      ZOO_DATA_DIR: /data
+    volumes:
+      - zk2_data:/data 
+    healthcheck:
+      test: ["CMD", "/opt/healthcheck-tls.sh"]
+      interval: 60s
+      timeout: 60s
+      retries: 5
+      start_period: 230s   
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.72
+    cap_add:
+      - SYS_TIME
+    extra_hosts: *shared-hosts
+
+  zookeeper3:
+    build:
+      context: .
+      dockerfile: ./zookeeper/config/Dockerfile.zookeeper3
+    container_name: zookeeper3
+    hostname: zookeeper3
+    ports:
+      - "2224:22"    
+      - "7013:7013"         
+      - "2183:2181"
+      - "2890:2888"
+      - "3890:3888"
+    environment:
+      ZOO_MY_ID: 3      
+      ZOO_SERVERS: server.1=zookeeper1:2888:3888;server.2=zookeeper2:2888:3888;server.3=zookeeper3:2888:3888,server.4=zookeeper4:2888:3888:observer,server.5=zookeeper5:2888:3888:observer
+      ZOO_DATA_DIR: /data
+    volumes:
+      - zk3_data:/data 
+    healthcheck:
+      test: ["CMD", "/opt/healthcheck-tls.sh"]
+      interval: 60s
+      timeout: 60s
+      retries: 5
+      start_period: 230s     
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.73
+    cap_add:
+      - SYS_TIME
+    extra_hosts: *shared-hosts
+
+  zookeeper4:
+    build:
+      context: .
+      dockerfile: ./zookeeper/config/Dockerfile.zookeeper4
+    container_name: zookeeper4
+    hostname: zookeeper4
+    ports:
+      - "2225:22"      
+      - "7014:7014"     
+      - "2184:2181"
+      - "2891:2888"
+      - "3891:3888"
+    environment:
+      ZOO_MY_ID: 4   
+      ZOO_SERVERS: server.1=zookeeper1:2888:3888;server.2=zookeeper2:2888:3888;server.3=zookeeper3:2888:3888,server.4=zookeeper4:2888:3888:observer,server.5=zookeeper5:2888:3888:observer
+      ZOO_DATA_DIR: /data
+    volumes:
+      - zk4_data:/data 
+    healthcheck:
+      test: ["CMD", "/opt/healthcheck-tls.sh"]
+      interval: 60s
+      timeout: 60s
+      retries: 5
+      start_period: 230s     
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.74
+    cap_add:
+      - SYS_TIME
+    extra_hosts: *shared-hosts
+
+  zookeeper5:
+    build:
+      context: .
+      dockerfile: ./zookeeper/config/Dockerfile.zookeeper5
+    container_name: zookeeper5
+    hostname: zookeeper5
+    ports:
+      - "2226:22"        
+      - "7015:7015"  
+      - "2185:2181"
+      - "2892:2888"
+      - "3892:3888"
+    environment:
+      ZOO_MY_ID: 5
+      ZOO_SERVERS: server.1=zookeeper1:2888:3888;server.2=zookeeper2:2888:3888;server.3=zookeeper3:2888:3888,server.4=zookeeper4:2888:3888:observer,server.5=zookeeper5:2888:3888:observer
+      ZOO_DATA_DIR: /data
+    volumes:
+      - zk5_data:/data 
+    healthcheck:
+      test: ["CMD", "/opt/healthcheck-tls.sh"]
+      interval: 60s
+      timeout: 60s
+      retries: 5
+      start_period: 230s  
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.75
+    cap_add:
+      - SYS_TIME
+    extra_hosts: *shared-hosts
+
+  spark-jupyter:
+    container_name: spark-jupyter
+    build:
+      context: .
+      dockerfile: ./Spark-Cluster/Dockerfile.spark-jupyter
+    hostname: spark-jupyter
+    ports:
+      - "8079:8888"
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+      SPARK_MASTER: "spark://spark-master1:7077,spark-master2:7077,spark-master3:7077"
+    depends_on:
+      spark-master1:
+        condition: service_started
+      zookeeper1:
+        condition: service_healthy
+      zookeeper2:
+        condition: service_healthy
+      zookeeper3:
+        condition: service_healthy
+      zookeeper4:
+        condition: service_healthy  
+      zookeeper5:
+        condition: service_healthy 
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.85
+    extra_hosts: *shared-hosts
+
+  hive-metastore:
+    build:
+      context: .
+      dockerfile: ./hive/Dockerfile.hive-metastore
+    container_name: hive-metastore
+    hostname: hive-metastore
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_DRIVER: postgres
+      SKIP_SCHEMA_INIT: 'false'
+      HIVE_SERVICE: metastore
+      HIVE_LOG_DIR: /opt/hive/logs
+      SERVICE_NAME: "metastore"
+      SERVICE_OPTS: '-Xmx1G -Djavax.jdo.option.ConnectionDriverName=org.postgresql.Driver
+                     -Djavax.jdo.option.ConnectionURL=jdbc:postgresql://postgres:5432/hive
+                     -Djavax.jdo.option.ConnectionUserName=nelonba
+                     -Djavax.jdo.option.ConnectionPassword=Password123456789'
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+    volumes:
+      - ./hive/hive-site.xml:/opt/hive/conf/hive-site.xml
+      - ./hive/metastore-site.xml:/opt/hive/conf/metastore-site.xml
+      - ./hive/log4j2.properties:/opt/hive/conf/log4j2.properties
+      - ./hive/core-site.xml:/opt/hive/conf/core-site.xml
+    ports:
+      - "9083:9083"
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.33
+    depends_on:
+      postgres:
+        condition: service_healthy    
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z hive-metastore 9083"]
+      interval: 45s
+      timeout: 45s
+      retries: 10
+      start_period: 10s
+
+networks:
+  nelo-data-pipeline:
+    driver: bridge
+    name: nelo-data-pipeline
+    attachable: true
+    ipam:
+      config:
+        - subnet: "172.20.10.0/24"
+          gateway: "172.20.10.254"
+
+volumes: 
+  zk1_data:
+  zk2_data:
+  zk3_data:
+  zk4_data:
+  zk5_data:
+
+  kafka1_data:
+  kafka2_data:
+  kafka3_data:
+  kafka4_data:
+  kafka-ui_data:
+
+  postgres-data:
+
+  redis-data: 
+  trino_data:
+  airflow-logs:        
