@@ -1,0 +1,90 @@
+# Master security properties file
+
+# List of security providers and their preference orders
+security.provider.1=SUN
+security.provider.2=SunRsaSign
+security.provider.3=SunEC
+security.provider.4=SunJSSE
+security.provider.5=SunJCE
+security.provider.6=SunJGSS
+security.provider.7=XMLDSig
+security.provider.8=SunPCSC
+security.provider.9=JdkLDAP
+security.provider.10=SunPKCS11
+security.provider.11=org.bouncycastle.jce.provider.BouncyCastleProvider
+
+# (Removed sun.security.ssl.debug)
+# (Removed java.security.debug=all if you don’t want *all* debug. Otherwise keep it.)
+
+# SecureRandom configuration
+securerandom.source=file:/dev/urandom
+securerandom.strongAlgorithms=DRBG:BouncyCastle,NativePRNGNonBlocking:SUN
+securerandom.drbg.config=Hash_DRBG,SHA-256,256,none
+
+# Login configuration provider
+login.configuration.provider=sun.security.provider.ConfigFile
+
+# System Policy configuration
+policy.provider=sun.security.provider.PolicyFile
+policy.url.1=file:/usr/lib/jvm/java-17-openjdk-amd64/conf/security/java.policy
+policy.expandProperties=true
+policy.allowSystemProperty=true
+policy.ignoreIdentityScope=false
+
+# Default keystore type and compatibility mode
+keystore.type=pkcs12
+keystore.type.compat=true
+keystore.pkcs12.type=pkcs12
+keystore.jks.type=jks
+keystore.provider=org.bouncycastle.jce.provider.BouncyCastleProvider
+
+# Package access restrictions
+package.access=sun.misc.,\
+               sun.reflect.
+
+# Package definition restrictions
+package.definition=sun.misc.,\
+                   sun.reflect.
+
+# Override properties file setting
+security.overridePropertiesFile=false
+
+# Default key and trust manager factory algorithms
+ssl.KeyManagerFactory.algorithm=SunX509
+ssl.TrustManagerFactory.algorithm=PKIX
+
+# Retains trusted certificates in the validation process
+sun.security.validator.PKIXValidator.keepTrustedCerts=true
+
+# Enables end-to-end certificate validation
+sun.security.validator.end2end=true
+
+# Network address cache policy for failed lookups
+networkaddress.cache.ttl=-1
+networkaddress.cache.negative.ttl=10
+
+# (Removed any jdk.tls.*, jdk.tls.server.*, jdk.tls.client.* lines
+#  that specifically force TLS config, if desired.)
+
+# (Removed references to older TLS versions and cipher suites
+#  if purely SSL-related.)
+
+# (Kept other general security configurations that are not SASL/SSL-specific.)
+
+# javax security auth settings
+javax.security.auth.useSubjectCredsOnly=false
+
+# KDC retry configuration for high availability
+sun.security.krb5.kdcRetries=3
+sun.security.krb5.kdcTimeout=7000
+
+# Use native GSS libraries (commented out by default)
+#sun.security.jgss.native=true
+#sun.security.jgss.lib=/usr/lib/libgssapi_krb5.so.2.2
+
+sun.security.jgss.maxTokenSize=5242880
+sun.security.krb5.principal.name.format=KRB5_NT_PRINCIPAL
+java.security.krb5.realm=NELO.COM
+java.security.krb5.kdc=krb5-kdc-server-nelo-com
+
+# (Removed javax.net.debug=ssl,handshake)

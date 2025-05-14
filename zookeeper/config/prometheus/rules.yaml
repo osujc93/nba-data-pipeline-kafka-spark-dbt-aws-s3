@@ -1,0 +1,119 @@
+groups:
+  - name: zookeeper_alerts
+    rules:
+      - alert: ZooKeeperDown
+        expr: up{job="zookeeper"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "ZooKeeper Instance Down"
+          description: "The ZooKeeper instance on {{ $labels.instance }} is down."
+
+      - alert: HighCPUUsage
+        expr: process_cpu_seconds_total{job="zookeeper"} > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU Usage on {{ $labels.instance }}"
+          description: "CPU usage on {{ $labels.instance }} is above 80%."
+
+      - alert: MemoryUsageCritical
+        expr: jvm_memory_heap_used_bytes / jvm_memory_heap_max_bytes > 0.9
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical Memory Usage on {{ $labels.instance }}"
+          description: "Memory usage on {{ $labels.instance }} is above 90%."
+
+      - alert: JvmMemoryFillingUp
+        expr: jvm_memory_bytes_used / jvm_memory_bytes_max{area="heap"} > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "JVM Memory Filling Up (Instance {{ $labels.instance }})"
+          description: "JVM memory on {{ $labels.instance }} is filling up (> 80%). Labels: {{ $labels }} Value: {{ $value }}."
+
+      - alert: CreateTooManyZnodes
+        expr: znode_count > 1000000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance {{ $labels.instance }} Creating Too Many Znodes"
+          description: "Instance {{ $labels.instance }} of job {{ $labels.job }} is creating too many znodes: {{ $value }}."
+
+      - alert: CreateTooManyConnections
+        expr: num_alive_connections > 50 # Default maxClientCnxns: 60
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance {{ $labels.instance }} Creating Too Many Connections"
+          description: "Instance {{ $labels.instance }} of job {{ $labels.job }} is creating too many connections: {{ $value }}."
+
+      - alert: ZnodeTotalOccupiedMemoryTooBig
+        expr: (approximate_data_size / (1024 * 1024)) > 1024 # More than 1024 MB (1 GB)
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance {{ $labels.instance }} Znode Total Occupied Memory Too Big"
+          description: "Instance {{ $labels.instance }} of job {{ $labels.job }} has znode total occupied memory too big: {{ $value }} MB."
+
+      - alert: SetTooManyWatch
+        expr: watch_count > 10000
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance {{ $labels.instance }} Setting Too Many Watches"
+          description: "Instance {{ $labels.instance }} of job {{ $labels.job }} is setting too many watches: {{ $value }}."
+
+      - alert: LeaderElectionHappened
+        expr: increase(election_time_count[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Leader Election Happened on Instance {{ $labels.instance }}"
+          description: "Leader election has occurred on instance {{ $labels.instance }} of job {{ $labels.job }}: {{ $value }}."
+
+      - alert: OpenTooManyFiles
+        expr: open_file_descriptor_count > 300
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance {{ $labels.instance }} Opening Too Many Files"
+          description: "Instance {{ $labels.instance }} of job {{ $labels.job }} is opening too many files: {{ $value }}."
+
+      - alert: FsyncTimeTooLong
+        expr: rate(fsynctime_sum[1m]) > 100
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance {{ $labels.instance }} Fsync Time Too Long"
+          description: "Fsync time on instance {{ $labels.instance }} of job {{ $labels.job }} is too long: {{ $value }}."
+
+      - alert: TakeSnapshotTimeTooLong
+        expr: rate(snapshottime_sum[5m]) > 100
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance {{ $labels.instance }} Take Snapshot Time Too Long"
+          description: "Snapshot time on instance {{ $labels.instance }} of job {{ $labels.job }} is too long: {{ $value }}."
+
+      - alert: AvgLatencyTooHigh
+        expr: avg_latency > 100 # Specify units, e.g., milliseconds
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Instance {{ $labels.instance }} Average Latency Too High"
+          description: "Average latency on instance {{ $labels.instance }} of job {{ $labels.job }} is too high: {{ $value }} ms."
