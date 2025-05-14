@@ -1,0 +1,8 @@
+FROM postgres:16
+
+# Copy the initialization script
+COPY ./postgres/init-postgres.sh /docker-entrypoint-initdb.d/init-postgres.sh
+COPY ./postgres/hives-schema-4.0.0.postgres.sql /docker-entrypoint-initdb.d/hives-schema-4.0.0.postgres.sql
+
+# Ensure the script is executable
+RUN chmod +x /docker-entrypoint-initdb.d/init-postgres.sh
