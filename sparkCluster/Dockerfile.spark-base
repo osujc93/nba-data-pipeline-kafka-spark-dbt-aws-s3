@@ -1,0 +1,143 @@
+FROM apache/spark:3.5.1-scala2.12-java17-python3-r-ubuntu
+
+USER root
+
+RUN useradd -u 1001 -m sparkuser
+
+RUN apt-get update && \
+    apt-get install -y \
+      openjdk-17-jdk \
+      sudo vim net-tools ufw iptables iproute2 \
+      python3.11 python3.11-dev python3.11-distutils \
+      build-essential wget curl gnupg procps libpq-dev gosu tini \
+      gfortran libopenblas-base libopenblas-dev liblapack-dev netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+# Make python3 point to python3.11
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+# Verify Java installation
+RUN java -version
+
+# Configure passwordless sudo for sparkuser
+RUN echo 'sparkuser ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/sparkuser \
+    && chmod 0440 /etc/sudoers.d/sparkuser
+
+# Set JAVA_HOME
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV PATH=$PATH:$JAVA_HOME/bin:$SPARK_HOME/bin
+
+# Upgrade pip, setuptools, and wheel
+RUN python3 -m pip install --no-cache-dir --upgrade pip setuptools wheel
+
+COPY /sparkCluster/requirements.txt /tmp/requirements.txt
+
+RUN pip config set global.require-hashes false
+
+# Install Python packages from requirements.txt
+RUN pip --default-timeout=100 install --no-cache-dir -r /tmp/requirements.txt
+
+# ------------------------------------------------------------------------------
+# Download/Install extra Spark JARs (Iceberg, XGBoost, etc.),
+# ------------------------------------------------------------------------------
+
+RUN mkdir -p /opt/spark/jars \
+    && wget -O /opt/spark/jars/iceberg-spark-runtime-3.5_2.12-1.7.1.jar \
+        "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.7.1/iceberg-spark-runtime-3.5_2.12-1.7.1.jar" \
+    && wget -O /opt/spark/jars/spark-sql-kafka-0-10_2.12-3.5.1.jar \
+        "https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/3.5.1/spark-sql-kafka-0-10_2.12-3.5.1.jar" \
+    && wget -O /opt/spark/jars/xgboost4j-spark_2.12-2.1.3.jar \
+        "https://repo1.maven.org/maven2/ml/dmlc/xgboost4j-spark_2.12/2.1.3/xgboost4j-spark_2.12-2.1.3.jar" \
+    && wget -O /opt/spark/jars/woodstox-core-7.1.0.jar \
+        "https://repo1.maven.org/maven2/com/fasterxml/woodstox/woodstox-core/7.1.0/woodstox-core-7.1.0.jar" \
+    && wget -O /opt/spark/jars/stax2-api-4.2.2.jar \
+        "https://repo1.maven.org/maven2/org/codehaus/woodstox/stax2-api/4.2.2/stax2-api-4.2.2.jar" \
+    && wget -O /opt/spark/jars/spark-nlp_2.12-5.5.2.jar \
+        "https://repo1.maven.org/maven2/com/johnsnowlabs/nlp/spark-nlp_2.12/5.5.2/spark-nlp_2.12-5.5.2.jar" \
+    && wget -O /opt/spark/jars/commons-configuration2-2.11.0.jar \
+        "https://repo1.maven.org/maven2/org/apache/commons/commons-configuration2/2.11.0/commons-configuration2-2.11.0.jar" \
+    && wget -O /opt/spark/jars/protobuf-java-4.29.3.jar \
+        "https://repo1.maven.org/maven2/com/google/protobuf/protobuf-java/4.29.3/protobuf-java-4.29.3.jar" \
+    && wget -O /opt/spark/jars/kafka-clients-3.5.1.jar \
+        "https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.5.1/kafka-clients-3.5.1.jar" \
+    && wget -O /opt/spark/jars/spark-token-provider-kafka-0-10_2.12-3.5.1.jar \
+        "https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_2.12/3.5.1/spark-token-provider-kafka-0-10_2.12-3.5.1.jar" \
+    && wget -O /opt/spark/jars/commons-pool2-2.12.0.jar \
+        "https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.12.0/commons-pool2-2.12.0.jar"
+
+
+RUN wget -O /opt/spark/jars/hadoop-aws-3.3.4.jar \
+        "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar" \
+    && wget -O /opt/spark/jars/hadoop-cloud-storage-3.3.4.jar \
+        "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-cloud-storage/3.3.4/hadoop-cloud-storage-3.3.4.jar" \
+    && wget -O /opt/spark/jars/hadoop-client-api-3.3.4.jar \
+        "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-client-api/3.3.4/hadoop-client-api-3.3.4.jar" \
+    && wget -O /opt/spark/jars/hadoop-client-runtime-3.3.4.jar \
+        "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-client-runtime/3.3.4/hadoop-client-runtime-3.3.4.jar" \
+    && wget -O /opt/spark/jars/hadoop-hdfs-client-3.3.4.jar \
+        "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-hdfs-client/3.3.4/hadoop-hdfs-client-3.3.4.jar" \
+    && wget -O /opt/spark/jars/hadoop-hdfs-3.3.4.jar \
+        "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-hdfs/3.3.4/hadoop-hdfs-3.3.4.jar" \
+    && wget -O /opt/spark/jars/hadoop-common-3.3.4.jar \
+        "https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-common/3.3.4/hadoop-common-3.3.4.jar"
+
+RUN wget -O /opt/spark/jars/aws-java-sdk-bundle-1.12.504.jar \
+      "https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.504/aws-java-sdk-bundle-1.12.504.jar"
+
+RUN wget -O /opt/spark/jars/postgresql-42.7.3.jar \
+      "https://jdbc.postgresql.org/download/postgresql-42.7.3.jar"
+
+RUN mkdir -p /opt/spark/conf
+COPY /sparkCluster/defaults/spark/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
+COPY /sparkCluster/metrics/metrics.properties /opt/spark/conf/metrics.properties
+COPY /sparkCluster/defaults/logging/log4j.properties /opt/spark/conf/log4j.properties
+COPY /sparkCluster/defaults/logging/log4j.properties /org/apache/spark/log4j2-defaults.properties
+COPY /sparkCluster/security/java.policy $JAVA_HOME/conf/security/java.policy
+COPY /sparkCluster/security/java.security $JAVA_HOME/conf/security/java.security
+
+COPY /hive/hive-site.xml /opt/spark/conf/hive-site.xml
+COPY /hive/metastore-site.xml /opt/spark/conf/metastore-site.xml
+COPY /hive/core-site.xml /opt/spark/conf/core-site.xml
+
+ENV HIVE_CONF_DIR=/opt/spark/conf
+ENV HADOOP_CONF_DIR=/opt/spark/conf
+ENV SPARK_CONF_DIR=/opt/spark/conf
+
+RUN mkdir -p /opt/airflow/sparkJobs
+
+COPY /kafkaProducers /kafkaProducers
+COPY /sparkJobs /sparkJobs
+COPY /sparkJobs /opt/airflow/sparkJobs
+COPY /sparkJobs/xgboost4j /sparkXGBoost4j
+
+RUN cd /opt/airflow/sparkJobs/firstBatch && \
+    zip -r firstBatchPackage.zip firstBatch.py batchProcessor.py icebergTableManager.py sparkSessionManager.py
+
+RUN cd /opt/airflow/sparkJobs/incremental && \
+    zip -r incrementalPackage.zip nbaIncrementalClass.py incrementalProcessor.py icebergTableManager.py sparkSessionManager.py
+
+RUN cd /opt/airflow/sparkJobs/xgboost4j/teams/classification && \
+    zip -r teamsClassificationPackage.zip cleanData.py featureEngineer.py hyperoptTrain.py lassoSelect.py loadData.py pipelineWorkflow.py sparkManager.py statsLogger.py xgboostPredict.py
+
+RUN cd /opt/airflow/sparkJobs/xgboost4j/players/classification && \
+    zip -r playersClassificationPackage.zip cleanData.py featureEngineer.py hyperoptTrain.py lassoSelect.py loadData.py pipelineWorkflow.py sparkManager.py statsLogger.py xgboostPredict.py
+
+# Force PySpark to use python3
+ENV PYSPARK_PYTHON=/usr/bin/python3
+ENV PYSPARK_DRIVER_PYTHON=/usr/bin/python3
+
+RUN mkdir -p /opt/spark/work \
+    && mkdir -p /opt/spark-events \
+    && mkdir -p /opt/spark/logs \
+    && chown -R sparkuser:sparkuser /opt/spark
+
+RUN chmod 1777 /tmp
+
+# Default command - overridden by child images
+CMD ["tail", "-f", "/dev/null"]
+
+# Use tini as entrypoint
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+# Switch to sparkuser
+USER sparkuser

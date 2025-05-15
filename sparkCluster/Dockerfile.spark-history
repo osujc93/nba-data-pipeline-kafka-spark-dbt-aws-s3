@@ -1,0 +1,22 @@
+FROM spark-base:latest
+
+USER root
+
+COPY /sparkCluster/defaults/history/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
+
+COPY /sparkCluster/defaults/logging/log4j.properties /opt/spark/conf/log4j.properties
+COPY /sparkCluster/defaults/logging/log4j.properties /org/apache/spark/log4j2-defaults.properties
+
+COPY /sparkCluster/env/history/spark-env.sh /opt/spark/conf/spark-env.sh
+RUN chmod +x /opt/spark/conf/spark-env.sh
+
+COPY /sparkCluster/entrypoints/history/entrypoint.sh /opt/entrypoint.sh
+RUN chmod +x /opt/entrypoint.sh
+
+RUN mkdir -p /opt/spark/logs && chown -R sparkuser:sparkuser /opt/spark/logs
+
+USER sparkuser
+
+CMD ["history"]
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/opt/entrypoint.sh"]

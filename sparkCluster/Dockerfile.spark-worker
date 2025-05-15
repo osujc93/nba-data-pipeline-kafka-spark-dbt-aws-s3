@@ -1,0 +1,35 @@
+FROM spark-base:latest
+
+USER root
+
+COPY sparkCluster/defaults/spark/spark-defaults.conf /opt/spark/conf/spark-defaults.conf
+COPY sparkCluster/env/spark/spark-env.sh /opt/spark/conf/spark-env.sh
+RUN chmod +x /opt/spark/conf/spark-env.sh
+
+COPY sparkCluster/defaults/logging/log4j.properties /opt/spark/conf/log4j.properties
+COPY sparkCluster/defaults/logging/log4j.properties /org/apache/spark/log4j2-defaults.properties
+
+COPY sparkCluster/entrypoints/entrypoint.sh /opt/entrypoint.sh
+RUN chmod +x /opt/entrypoint.sh
+
+RUN mkdir -p /opt/spark/logs && chown -R sparkuser:sparkuser /opt/spark/logs
+
+RUN cd /opt/airflow/sparkJobs/firstBatch && \
+    zip -r firstBatchPackage.zip firstBatch.py batchProcessor.py icebergTableManager.py sparkSessionManager.py
+
+RUN cd /opt/airflow/sparkJobs/incremental && \
+    zip -r incrementalPackage.zip nbaIncrementalClass.py incrementalProcessor.py icebergTableManager.py sparkSessionManager.py
+
+RUN cd /opt/airflow/sparkJobs/xgboost4j/teams/classification && \
+    zip -r teamsClassificationPackage.zip cleanData.py featureEngineer.py hyperoptTrain.py lassoSelect.py loadData.py pipelineWorkflow.py sparkManager.py statsLogger.py xgboostPredict.py
+
+RUN cd /opt/airflow/sparkJobs/xgboost4j/players/classification && \
+    zip -r playersClassificationPackage.zip cleanData.py featureEngineer.py hyperoptTrain.py lassoSelect.py loadData.py pipelineWorkflow.py sparkManager.py statsLogger.py xgboostPredict.py
+
+USER sparkuser
+
+EXPOSE 8081
+
+CMD ["worker"]
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/opt/entrypoint.sh"]
