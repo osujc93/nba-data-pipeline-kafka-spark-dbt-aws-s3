@@ -9,21 +9,20 @@ Contents
 <!--ts-->
    * [Summary](#summary)
    * [Deployment](#deployment)
+   * [Tables](#tables) 
    * [Kafka (KRaft Mode)](#kafka-kraft-mode)
       * [Kafka-UI (Optional)](#kafka-ui-optional)
    * [Spark (Standalone)](#spark-standalone)
       * [Zookeeper HA](#zookeeper-ha)
    * [Dbt](#dbt)
-      * [Data Modeling](#data-modeling)
    * [AWS-S3](#aws-s3)
+   * [Hive-Metastore](#hive-metastore)
    * [Trino](#trino)
-      * [Hive-Metastore](#hive-metastore)
    * [Superset](#superset)
    * [Spark-MLib](#spark-mlib)
       * [MLflow](#mlflow)
    * [Airflow](#airflow)
    * [Postgres](#postgres)
-      * [pgAdmin (Optional)](#pgadmin-optional)
 <!--te-->
 
 Summary
