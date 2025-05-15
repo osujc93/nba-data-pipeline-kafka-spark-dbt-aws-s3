@@ -35,9 +35,9 @@ Summary
 
 - Took data with initial batch ingestion of boxscores from 1946 to current date. and then daily from the last ingestion date.
 
-- To not fire off requests and cause 443 or 503 HTTP errors, used a token-bucket rate limiter to space out requests, one every seven seconds. 
+- The endpoint has rate limits. So to prevent timeouts, I used a token-bucket rate limiter to space out requests, one every seven seconds. 
 
-- And set ThreadPoolExecutor with max_workers=1 so each API request finishes fully before the next one starts. This helped with not flooding the API and prevent timeouts. 
+- And set ThreadPoolExecutor with max_workers=1 so each API request finishes fully before the next one starts.
 
 - After the initial batch finishes, it inserts a last-ingestion date into Postgres, so that subsequent incremental runs know exactly where to resume from.
 
