@@ -142,7 +142,7 @@ services:
   kafka1:
     build:
       context: .
-      dockerfile: ./Kafka-kRaft-Cluster/Dockerfile.kafka1
+      dockerfile: ./kafkaKRaft/Dockerfile.kafka1
     container_name: kafka1
     hostname: kafka1    
     ports:
@@ -183,7 +183,7 @@ services:
   kafka2:
     build:
       context: .
-      dockerfile: ./Kafka-kRaft-Cluster/Dockerfile.kafka2
+      dockerfile: ./kafkaKRaft/Dockerfile.kafka2
     container_name: kafka2
     hostname: kafka2    
     ports:
@@ -224,7 +224,7 @@ services:
   kafka3:
     build:
       context: .
-      dockerfile: ./Kafka-kRaft-Cluster/Dockerfile.kafka3
+      dockerfile: ./kafkaKRaft/Dockerfile.kafka3
     container_name: kafka3
     hostname: kafka3    
     ports:
@@ -265,7 +265,7 @@ services:
   kafka4:
     build:
       context: .
-      dockerfile: ./Kafka-kRaft-Cluster/Dockerfile.kafka4
+      dockerfile: ./kafkaKRaft/Dockerfile.kafka4
     container_name: kafka4
     hostname: kafka4    
     ports:
@@ -324,8 +324,8 @@ services:
       KAFKA_CLUSTERS_0_SECURITY_PROTOCOL: PLAINTEXT
     volumes:
       - kafka-ui_data:/var/lib/kafka-ui/data
-      - ./Kafka-kRaft-Cluster/properties/logging/logback.xml:/etc/kafka-ui/logback.xml
-      - ./Kafka-kRaft-Cluster/logs:/var/lib/kafka-ui/logs
+      - ./kafkaKRaft/properties/logging/logback.xml:/etc/kafka-ui/logback.xml
+      - ./kafkaKRaft/logs:/var/lib/kafka-ui/logs
     networks:
       nelo-data-pipeline:
         ipv4_address: 172.20.10.5
@@ -656,14 +656,14 @@ services:
     container_name: spark-base
     build:
       context: .
-      dockerfile: ./Spark-Cluster/Dockerfile.spark-base
+      dockerfile: ./sparkCluster/Dockerfile.spark-base
     image: spark-base:latest
     command: tail -f /dev/null
 
   spark-client:
     build:
       context: .
-      dockerfile: ./Spark-Cluster/Dockerfile.spark-client
+      dockerfile: ./sparkCluster/Dockerfile.spark-client
     image: spark-client:latest
     container_name: spark-client
     networks:
@@ -678,7 +678,7 @@ services:
     container_name: spark-master1
     build:
       context: .
-      dockerfile: ./Spark-Cluster/Dockerfile.spark-master
+      dockerfile: ./sparkCluster/Dockerfile.spark-master
     image: spark-master:latest
     hostname: spark-master1
     networks:
@@ -716,7 +716,7 @@ services:
     container_name: spark-master2
     build:
       context: .
-      dockerfile: ./Spark-Cluster/Dockerfile.spark-master
+      dockerfile: ./sparkCluster/Dockerfile.spark-master
     image: spark-master:latest
     hostname: spark-master2
     networks:
@@ -754,7 +754,7 @@ services:
     container_name: spark-master3
     build:
       context: .
-      dockerfile: ./Spark-Cluster/Dockerfile.spark-master
+      dockerfile: ./sparkCluster/Dockerfile.spark-master
     image: spark-master:latest
     hostname: spark-master3
     networks:
@@ -792,7 +792,7 @@ services:
     container_name: spark-worker1
     build:
       context: .
-      dockerfile: ./Spark-Cluster/Dockerfile.spark-worker
+      dockerfile: ./sparkCluster/Dockerfile.spark-worker
     image: spark-worker:latest
     hostname: spark-worker1
     networks:
@@ -826,7 +826,7 @@ services:
     container_name: spark-worker2
     build:
       context: .
-      dockerfile: ./Spark-Cluster/Dockerfile.spark-worker
+      dockerfile: ./sparkCluster/Dockerfile.spark-worker
     image: spark-worker:latest
     hostname: spark-worker2
     networks:
@@ -860,7 +860,7 @@ services:
     container_name: spark-worker3
     build:
       context: .
-      dockerfile: ./Spark-Cluster/Dockerfile.spark-worker
+      dockerfile: ./sparkCluster/Dockerfile.spark-worker
     image: spark-worker:latest
     hostname: spark-worker3
     networks:
@@ -893,7 +893,7 @@ services:
   spark-history:
     build:
       context: .
-      dockerfile: ./Spark-Cluster/Dockerfile.spark-history
+      dockerfile: ./sparkCluster/Dockerfile.spark-history
     container_name: spark-history
     image: spark-history:latest
     ports:
