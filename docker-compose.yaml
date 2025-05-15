@@ -123,7 +123,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}     
       POSTGRES_PORT: ${POSTGRES_PORT}     
       POSTGRES_HOST: ${POSTGRES_HOST}  
-      POSTGRES_ROLE: ${POSTGRES_ROLE}        
+      POSTGRES_ROLE: ${POSTGRES_ROLE}  
+      POSTGRES_DB: ${POSTGRES_DB}      
       DOCKER_API_VERSION: '1.41'              
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -141,7 +142,7 @@ services:
   kafka1:
     build:
       context: .
-      dockerfile: ./Kafka-kRaft-Cluster/kafka/config/Dockerfile.kafka1
+      dockerfile: ./Kafka-kRaft-Cluster/Dockerfile.kafka1
     container_name: kafka1
     hostname: kafka1    
     ports:
@@ -182,7 +183,7 @@ services:
   kafka2:
     build:
       context: .
-      dockerfile: ./Kafka-kRaft-Cluster/kafka/config/Dockerfile.kafka2
+      dockerfile: ./Kafka-kRaft-Cluster/Dockerfile.kafka2
     container_name: kafka2
     hostname: kafka2    
     ports:
@@ -223,7 +224,7 @@ services:
   kafka3:
     build:
       context: .
-      dockerfile: ./Kafka-kRaft-Cluster/kafka/config/Dockerfile.kafka3
+      dockerfile: ./Kafka-kRaft-Cluster/Dockerfile.kafka3
     container_name: kafka3
     hostname: kafka3    
     ports:
@@ -264,7 +265,7 @@ services:
   kafka4:
     build:
       context: .
-      dockerfile: ./Kafka-kRaft-Cluster/kafka/config/Dockerfile.kafka4
+      dockerfile: ./Kafka-kRaft-Cluster/Dockerfile.kafka4
     container_name: kafka4
     hostname: kafka4    
     ports:
@@ -323,8 +324,8 @@ services:
       KAFKA_CLUSTERS_0_SECURITY_PROTOCOL: PLAINTEXT
     volumes:
       - kafka-ui_data:/var/lib/kafka-ui/data
-      - ./Kafka-kRaft-Cluster/kafka/config/properties/logging/logback.xml:/etc/kafka-ui/logback.xml
-      - ./Kafka-kRaft-Cluster/kafka/config/logs:/var/lib/kafka-ui/logs
+      - ./Kafka-kRaft-Cluster/properties/logging/logback.xml:/etc/kafka-ui/logback.xml
+      - ./Kafka-kRaft-Cluster/logs:/var/lib/kafka-ui/logs
     networks:
       nelo-data-pipeline:
         ipv4_address: 172.20.10.5
@@ -1038,11 +1039,11 @@ services:
         condition: service_healthy 
       postgres:
         condition: service_healthy
- 
+
   zookeeper1:
     build:
       context: .
-      dockerfile: ./zookeeper/config/Dockerfile.zookeeper1
+      dockerfile: ./zookeeper/Dockerfile.zookeeper1
     container_name: zookeeper1
     hostname: zookeeper1
     ports:
@@ -1073,7 +1074,7 @@ services:
   zookeeper2:
     build:
       context: .
-      dockerfile: ./zookeeper/config/Dockerfile.zookeeper2
+      dockerfile: ./zookeeper/Dockerfile.zookeeper2
     container_name: zookeeper2
     hostname: zookeeper2
     ports:
@@ -1104,7 +1105,7 @@ services:
   zookeeper3:
     build:
       context: .
-      dockerfile: ./zookeeper/config/Dockerfile.zookeeper3
+      dockerfile: ./zookeeper/Dockerfile.zookeeper3
     container_name: zookeeper3
     hostname: zookeeper3
     ports:
@@ -1135,7 +1136,7 @@ services:
   zookeeper4:
     build:
       context: .
-      dockerfile: ./zookeeper/config/Dockerfile.zookeeper4
+      dockerfile: ./zookeeper/Dockerfile.zookeeper4
     container_name: zookeeper4
     hostname: zookeeper4
     ports:
@@ -1166,7 +1167,7 @@ services:
   zookeeper5:
     build:
       context: .
-      dockerfile: ./zookeeper/config/Dockerfile.zookeeper5
+      dockerfile: ./zookeeper/Dockerfile.zookeeper5
     container_name: zookeeper5
     hostname: zookeeper5
     ports:
