@@ -1,0 +1,105 @@
+FROM apache/kafka:3.8.0
+
+USER root
+
+# Install necessary packages
+RUN apk update && apk add --no-cache \
+    shadow wget gnupg sudo iproute2 nftables bc lsof \
+    gcc musl-dev python3-dev libffi-dev libpq-dev iputils-ping \
+    net-tools ufw iptables procps kmod netcat-openbsd bind-tools \
+    psmisc vim openjdk17 py3-pip nmap bash dos2unix \
+    ca-certificates zlib-dev zstd-dev lz4-dev \
+    && rm -rf /var/cache/apk/*
+
+# Set JAVA_HOME environment variable
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk
+ENV PATH=$JAVA_HOME/bin:$PATH
+
+# Install Python packages in a virtual environment
+RUN python3 -m venv /opt/venv \
+    && /opt/venv/bin/pip install --upgrade pip \
+    && /opt/venv/bin/pip install --no-cache-dir \
+        psycopg2-binary \
+        pydantic \
+        aiohttp \
+        aiokafka \
+        lz4 \
+        zstandard \
+        requests \
+        kafka-python-ng \
+        pandas \
+        psutil \
+        six \
+        memory-profiler 
+
+# Ensure that the virtual environment is used
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Create kafka1 user and set password
+RUN useradd -m -s /bin/bash kafka1 && \
+    echo "kafka1:Nelo123456789" | chpasswd
+
+# Ensure the group exists and add user to the group
+RUN groupadd -f kafka && id -u kafka1 >/dev/null 2>&1 && usermod -aG kafka kafka1 || true
+
+# Add kafka1 to the wheel group and configure passwordless sudo
+RUN usermod -aG wheel kafka1 && \
+    echo "kafka1 ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Optionally, allow all wheel group members to have passwordless sudo
+RUN echo "%wheel ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Set the root password
+RUN echo "root:Nelo123456789" | chpasswd
+
+# Create necessary directories with appropriate ownership and permissions
+RUN mkdir -p /var/log/kafka /var/lib/kafka/data1 /opt/kafka/jmx_exporter /opt/kafka/config/jmx_exporter \
+    && chown -R kafka1:kafka /var/log/kafka /var/lib/kafka /opt/kafka/jmx_exporter /opt/kafka/config/jmx_exporter \
+    && chmod -R 750 /var/log/kafka /var/lib/kafka /opt/kafka/jmx_exporter /opt/kafka/config/jmx_exporter
+
+# Download JMX Exporter
+RUN wget -qO /opt/kafka/jmx_exporter/jmx_prometheus_javaagent.jar \
+    https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/1.0.1/jmx_prometheus_javaagent-1.0.1.jar
+
+# Copy JMX Exporter configuration with ownership set to kafka1:kafka
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/jmx/jmx_exporter1.yaml \
+    /opt/kafka/config/jmx_exporter/jmx_exporter.yaml
+RUN chmod 640 /opt/kafka/config/jmx_exporter/jmx_exporter.yaml
+
+# Copy necessary configuration files with ownership set to kafka1:kafka
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/properties/logging/log4j.properties /opt/kafka/config/log4j.properties
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/entrypoints/entrypoint.sh /opt/kafka/config/entrypoint.sh
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/healthchecks/node1/healthcheck.sh /opt/kafka/config/healthcheck.sh
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/properties/server1/server1.properties /opt/kafka/config/server.properties
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/properties/update_meta_properties.sh /opt/kafka/config/update_meta_properties.sh
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/properties/kafka-run-class.sh /opt/kafka/bin/kafka-run-class.sh
+
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/properties/server1/consumer1.properties /opt/kafka/config/consumer.properties
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/properties/server1/producer1.properties /opt/kafka/config/producer.properties
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/properties/server1/kraft-broker1.properties /opt/kafka/config/kraft/broker.properties
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/properties/server1/kraft-server1.properties /opt/kafka/config/kraft/server.properties
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/properties/server1/kraft-controller1.properties /opt/kafka/config/kraft/controller.properties
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/properties/server1/client1.properties /opt/kafka/config/client.properties
+COPY --chown=kafka1:kafka /Kafka-kRaft-Cluster/properties/server1/admin.properties /opt/kafka/config/admin.properties
+
+COPY /kafkaProducers /kafkaProducers
+COPY /sparkJobs /sparkJobs
+COPY /sparkJobs/xgboost4j /sparkXGBoost4j
+
+# Set permissions for executable scripts
+RUN chmod 750 /opt/kafka/config/entrypoint.sh /opt/kafka/config/healthcheck.sh \
+    && chmod 640 /opt/kafka/config/log4j.properties /opt/kafka/config/server.properties \
+    && chmod 640 /opt/kafka/config/consumer.properties /opt/kafka/config/producer.properties \
+    && chmod 640 /opt/kafka/config/kraft/broker.properties /opt/kafka/config/kraft/server.properties /opt/kafka/config/kraft/controller.properties \
+    && chmod 640 /opt/kafka/config/client.properties /opt/kafka/config/admin.properties \
+    && chmod 750 /opt/kafka/bin/kafka-run-class.sh \
+    && chmod 640 /opt/kafka/config/update_meta_properties.sh
+
+RUN dos2unix /opt/kafka/config/entrypoint.sh \
+    && chmod 750 /opt/kafka/config/entrypoint.sh
+
+# Switch to kafka1 user
+USER kafka1
+
+# Set the entrypoint script to start all services
+ENTRYPOINT ["/opt/kafka/config/entrypoint.sh"]
