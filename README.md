@@ -8,7 +8,7 @@ Contents
 
 <!--ts-->
    * [Summary](#summary)
-   * [Deployment](#deployment)
+   * [Setup](#Setup)
    * [Tables](#tables) 
    * [Kafka (KRaft Mode)](#kafka-kraft-mode)
       * [Kafka-UI (Optional)](#kafka-ui-optional)
@@ -92,18 +92,35 @@ Summary
 
 - If it’s <code>False</code>, Airflow runs my initial batch chain to ingest all boxscores. And once finished, it sets the flag to <code>True</code> so future daily runs automatically take the incremental path. This way I do the huge historical load only once, then each day I process just the new data.
 
-Deployment
-============
-
-Ran all apps containerized with docker compose
+## Setup
 
 32 gb of memory for VM/computer 
 
-```bash
-$ docker-compose build airflow-base spark-base
+1. Clone repository:
+   ```sh
+   $ git clone https://github.com/osujc93/nba-data-pipeline-kafka-spark-dbt-aws-s3
+   $ cd nba-data-pipeline-kafka-spark-dbt-aws-s3
+   ```
 
-$ docker-compose up -d
-```
+2. Build and start services:
+   
+   Ensure you have Docker & Docker Compose installed on your machine.
+   
+   ```sh
+   $ docker-compose build airflow-base spark-base
+
+   $ docker-compose up -d
+   ```
+
+3. Once containers are up and running, wait a few mins for Airflow to initialize, and then navigate to the following:
+   
+   Airflow UI - http://localhost:8082
+
+    - Username: <code>airflow12</code>
+   
+    - Password: <code>airflow12</code>
+
+   Kafka UI - http://localhost:8084
 
 Kafka (KRaft Mode)
 ===================
