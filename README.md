@@ -19,8 +19,6 @@ Contents
    * [Hive-Metastore](#hive-metastore)
    * [Trino](#trino)
    * [Superset](#superset)
-   * [Spark-MLib](#spark-mlib)
-      * [MLflow](#mlflow)
    * [Airflow](#airflow)
    * [Postgres](#postgres)
 <!--te-->
