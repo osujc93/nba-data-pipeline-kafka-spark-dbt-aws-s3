@@ -124,6 +124,8 @@ Summary
 
    ```sh
    $ docker exec -it trino trino --server http://localhost:8085
+
+   $ Use iceberg.iceberg_nba_player_boxscores;
    
    $ SELECT * FROM iceberg.iceberg_nba_player_boxscores.nba_player_boxscores WHERE year = 2026 ORDER BY team_name LIMIT 10;
    ```
