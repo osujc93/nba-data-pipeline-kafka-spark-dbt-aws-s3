@@ -1,6 +1,6 @@
 # File: Dockerfile.trino
 
-FROM openjdk:22-slim
+FROM openjdk:22-jdk-slim
 
 ENV TRINO_VERSION=448
 
