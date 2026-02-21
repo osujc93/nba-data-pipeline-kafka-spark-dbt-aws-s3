@@ -1,5 +1,5 @@
 # NBA-Data-Pipeline
-Data pipeline for NBA player boxscores using Kafka, Spark, Dbt, AWS S3 and more.
+Data pipeline for batch + incremental ingestion of NBA player boxscores using Kafka, Spark, Dbt, AWS S3 and more.
 
 ![Diagram](/assets/PipelineDiagram.png)
 
@@ -48,6 +48,10 @@ Summary
 
 - The maximum consumed offset for each partition is extracted, incremented by one, stored in a Postgres table as JSON. And then used as the starting offset in subsequent runs so the pipeline resumes exactly where it left off without duplicating any records.
 
+- I made the mistake of over-partitioning my Iceberg table at first, which caused Spark to create a bunch of tiny files across many partitions. Most of the runtime went to Iceberg manifest/metadata work and S3 commit overhead rather than actually writing data.
+
+- Switching to a simpler partition combo like <code>season</code> and <code>season_type</code> reduced the number of files and made the job finish in minutes.
+
 ### Transform 
 
 - Dbt models to transform the original <code>nba_player_boxscores</code> table.
@@ -57,6 +61,8 @@ Summary
 - Apply SCD Type 2 merges in Iceberg tables to track historical changes for players and teams.
 
 - Aggregate boxscores into advanced stats based on those defined in NBA's stats glossary.
+
+- I ran my dbt models through Trino on using an Iceberg catalog. dbt produces the SQL, Trino executes it on my Iceberg tables, and Hive Metastore keeps track of the S3 file paths, so the transformed results are saved back to my S3 bucket.
 
 ### Storage
 
@@ -81,6 +87,10 @@ Summary
 - Set <code>is_paused_upon_creation</code> to False so that dag starts once Airflow is running
 
 - With <code>schedule_interval="@daily"</code>, the workflow is every 24 hours at midnight EDT.
+
+- For airflow to dynamically decide which set of tasks to run, I use a <code>BranchPythonOperator</code> to check the <code>init_ingestion_done</code> Variable.
+
+- If it’s <code>False</code>, Airflow runs my initial batch chain to ingest all boxscores. And once finished, it sets the flag to <code>True</code> so future daily runs automatically take the incremental path. This way I do the huge historical load only once, then each day I process just the new data.
 
 Deployment
 ============
