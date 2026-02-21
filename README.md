@@ -11,9 +11,7 @@ Contents
    * [Setup](#Setup)
    * [Tables](#tables) 
    * [Kafka (KRaft Mode)](#kafka-kraft-mode)
-      * [Kafka-UI (Optional)](#kafka-ui-optional)
    * [Spark (Standalone)](#spark-standalone)
-      * [Zookeeper HA](#zookeeper-ha)
    * [Dbt](#dbt)
    * [AWS-S3](#aws-s3)
    * [Hive-Metastore](#hive-metastore)
@@ -129,9 +127,9 @@ Cluster runs in KRaft mode, with a dedicated controller and 3 brokers.
 
 The controller manages all cluster metadata, replacing the need for ZooKeeper. The brokers store and replicate the topic data.
 
-### Kafka-UI (Optional)
+Spark Standalone
+==================
 
-View Kafka-UI in web browser:
-```bash
-localhost:8084
-```
+- 3 masters: act as the Spark Standalone cluster managers. They accept spark-submit requests, keep track of worker resources, and schedule executors. Enabled ZooKeeper recovery so masters can recover cluster state after a restart and less likely to lose the cluster just because one master container restarted.
+
+- 3 workers: provide the compute layer (they host executors and run Spark tasks). Because I’m working with relatively small dataset (>2 million records) on a machine with limited RAM and multiple containers are competing for memory, I intentionally kept each worker small. 1 CPU core (spark.worker.cores=1) and about 4GB of Spark worker memory
