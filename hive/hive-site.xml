@@ -21,10 +21,10 @@
     <value>Password123456789</value>
   </property>
 
-  <!-- Warehouse dir on S3 -->
+  <!-- Warehouse directory on S3 -->
   <property>
     <name>hive.metastore.warehouse.dir</name>
-    <value>s3a://nelodatawarehouse93/warehouse</value>
+    <value>s3a://nelodatawarehouse933/warehouse</value>
   </property>
 
   <!-- Metastore thrift URI -->

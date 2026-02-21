@@ -7,12 +7,12 @@
 
     <property>
         <name>fs.s3a.endpoint</name>
-        <value>s3.us-east-2.amazonaws.com</value>
+        <value>s3.us-east-1.amazonaws.com</value>
     </property>
 
     <property>
         <name>fs.s3a.aws.region</name>
-        <value>us-east-2</value>
+        <value>us-east-1</value>
     </property>
 
     <property>
