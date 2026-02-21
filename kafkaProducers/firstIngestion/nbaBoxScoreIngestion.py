@@ -77,7 +77,7 @@ season_type_map: Dict[str, str] = {
 }
 
 # Define the seasons we want (1946-47 to 2024-25 as an example)
-seasons: List[str] = [f"{year}-{str(year+1)[-2:]}" for year in range(1946, 2025)]
+seasons: List[str] = [f"{year}-{str(year+1)[-2:]}" for year in range(1946, 2026)]
 
 FAILURES_LOG = "failures_log.json"
 
