@@ -1,0 +1,668 @@
+version: 2
+
+models:
+
+  # --------------------------------------------------
+  #  fact_player_boxscores
+  # --------------------------------------------------
+  - name: fact_player_boxscores
+    description: "SCD2 fact table tracking player-level boxscores for each game."
+    columns:
+      - name: season_id
+        description: "Season ID from the source system (e.g., 2022)."
+      - name: player_id
+        description: "Primary natural key for the player."
+      - name: player_name
+        description: "Name of the player."
+      - name: team_id
+        description: "Team ID for the player in this row."
+      - name: team_abbreviation
+        description: "Team abbreviation at the time of the game."
+      - name: team_name
+        description: "Full team name at the time of the game."
+      - name: game_id
+        description: "Unique game identifier."
+      - name: game_date
+        description: "Date of the game."
+      - name: matchup
+        description: "Matchup format, e.g., 'LAL @ BOS' or 'BOS vs. LAL'."
+      - name: win_loss
+        description: "Win/Loss result from the perspective of this player's team."
+      - name: minutes_played
+        description: "Minutes played by the player in that game."
+      - name: field_goals_made
+        description: "Number of field goals made."
+      - name: field_goals_attempted
+        description: "Number of field goals attempted."
+      - name: field_goal_percentage
+        description: "FG% for the player (0-1 range)."
+      - name: three_point_field_goals_made
+        description: "Number of 3-point FGs made."
+      - name: three_point_field_goals_attempted
+        description: "Number of 3-point FGs attempted."
+      - name: three_point_field_goal_percentage
+        description: "3P% for the player (0-1 range)."
+      - name: free_throws_made
+        description: "Number of free throws made."
+      - name: free_throws_attempted
+        description: "Number of free throws attempted."
+      - name: free_throw_percentage
+        description: "FT% for the player (0-1 range)."
+      - name: offensive_rebounds
+        description: "Number of offensive rebounds."
+      - name: defensive_rebounds
+        description: "Number of defensive rebounds."
+      - name: rebounds
+        description: "Total rebounds."
+      - name: assists
+        description: "Number of assists."
+      - name: steals
+        description: "Number of steals."
+      - name: blocks
+        description: "Number of blocked shots."
+      - name: turnovers
+        description: "Number of turnovers."
+      - name: personal_fouls
+        description: "Number of personal fouls."
+      - name: points
+        description: "Total points scored by the player."
+      - name: plus_minus
+        description: "+/- stat for the player that game."
+      - name: fantasy_points
+        description: "Calculated fantasy points (if available)."
+      - name: video_available
+        description: "Indicates if video highlight is available (bool or numeric)."
+      - name: season
+        description: "Season label (e.g., 2022)."
+      - name: season_type
+        description: "Season type (e.g., Regular, Preseason, Postseason)."
+      - name: year
+        description: "Calendar year portion of the game date."
+      - name: month
+        description: "Month portion of the game date."
+      - name: day
+        description: "Day portion of the game date."
+      - name: home_team
+        description: "Home team abbreviation as parsed from the matchup."
+      - name: away_team
+        description: "Away team abbreviation as parsed from the matchup."
+      - name: row_hash
+        description: "MD5 hash for the row to detect changes across increments."
+      - name: fact_player_game_key
+        description: "Primary key (unique) for this fact (player+season+game)."
+      - name: debut_date
+        description: "Earliest date in the player's current team SCD block."
+      - name: final_date
+        description: "Latest date in the player's current team SCD block."
+      - name: is_current
+        description: "Indicates if the record is the active SCD2 version for that player/team block."
+      - name: record_created_timestamp
+        description: "Timestamp when the row was first inserted."
+      - name: record_updated_timestamp
+        description: "Timestamp when the row was last updated."
+      - name: record_updated_by
+        description: "Process or user that last updated this row."
+
+
+  # --------------------------------------------------
+  #  fact_team_boxscores
+  # --------------------------------------------------
+  - name: fact_team_boxscores
+    description: "SCD2 fact table capturing team-level boxscore data per game."
+    columns:
+      - name: team_id
+        description: "Team ID from the source."
+      - name: team_name
+        description: "Full team name at that time."
+      - name: team_abbreviation
+        description: "Team abbreviation."
+      - name: season
+        description: "Season numeric or string label (e.g., 2022)."
+      - name: season_type
+        description: "Type of season (Regular, Preseason, Postseason)."
+      - name: game_id
+        description: "Unique game identifier from the source."
+      - name: game_date
+        description: "Date of the game."
+      - name: matchup
+        description: "Text representation of the teams playing (e.g., 'LAL @ BOS')."
+      - name: win_loss
+        description: "Indicates if this team won (W) or lost (L)."
+      - name: team_points
+        description: "Total points scored by this team in the game."
+      - name: team_fga
+        description: "Team field goals attempted (sum of players)."
+      - name: team_fgm
+        description: "Team field goals made (sum of players)."
+      - name: team_fg3a
+        description: "Team 3-point FGs attempted (sum)."
+      - name: team_fg3m
+        description: "Team 3-point FGs made (sum)."
+      - name: team_fta
+        description: "Team free throws attempted (sum)."
+      - name: team_ftm
+        description: "Team free throws made (sum)."
+      - name: team_tov
+        description: "Team turnovers (sum of players)."
+      - name: team_oreb
+        description: "Team offensive rebounds."
+      - name: team_dreb
+        description: "Team defensive rebounds."
+      - name: team_reb
+        description: "Team total rebounds."
+      - name: team_ast
+        description: "Team total assists."
+      - name: team_stl
+        description: "Team total steals."
+      - name: team_blk
+        description: "Team total blocks."
+      - name: partial_possessions
+        description: "Approx. possessions = FGA + 0.44*FTA + TOV."
+      - name: team_fg_pct
+        description: "Field goal percentage (0-1) for the team."
+      - name: team_fg3_pct
+        description: "3-point field goal percentage (0-1) for the team."
+      - name: team_ft_pct
+        description: "Free throw percentage (0-1) for the team."
+      - name: home_team
+        description: "Abbreviation for the home team."
+      - name: away_team
+        description: "Abbreviation for the away team."
+      - name: row_hash
+        description: "MD5 hash to detect changed rows in incremental loads."
+      - name: fact_team_game_key
+        description: "Primary key for the fact_team_boxscores table."
+      - name: debut_date
+        description: "Date on which this SCD block started for that team version."
+      - name: final_date
+        description: "Date on which this SCD block ended for that team version."
+      - name: is_current
+        description: "TRUE if this row is the current SCD version for that team block."
+      - name: record_created_timestamp
+        description: "Timestamp when the row was first inserted."
+      - name: record_updated_timestamp
+        description: "Timestamp when the row was last updated."
+      - name: record_updated_by
+        description: "Process/user that last updated this row."
+      - name: main_team_key
+        description: "Surrogate key from dim_team for the main team in the row."
+      - name: home_team_key
+        description: "dim_team surrogate key for the home team."
+      - name: away_team_key
+        description: "dim_team surrogate key for the away team."
+      - name: season_key
+        description: "dim_season surrogate key."
+      - name: game_key
+        description: "dim_game surrogate key."
+
+
+  # --------------------------------------------------
+  #  fact_player_adv_stats
+  # --------------------------------------------------
+  - name: fact_player_adv_stats
+    description: "Advanced player metrics (TS%, eFG%, USG%, etc.) at the individual game level."
+    columns:
+      - name: player_id
+        description: "Natural key for the player."
+      - name: player_name
+        description: "Player's name."
+      - name: team_id
+        description: "Team ID for the player's team that game."
+      - name: team_name
+        description: "Team name at the time."
+      - name: game_id
+        description: "Unique game identifier."
+      - name: season
+        description: "Season label."
+      - name: season_type
+        description: "Season type (Regular, Postseason, etc.)."
+      - name: game_date
+        description: "Date of the game."
+      - name: matchup
+        description: "Matchup text (e.g., 'LAL @ BOS')."
+      - name: home_team
+        description: "Home team abbreviation from the joined team data."
+      - name: away_team
+        description: "Away team abbreviation from the joined team data."
+      - name: win_loss
+        description: "Win or loss from the perspective of the player's team."
+      - name: plus_minus
+        description: "Plus-minus metric for the player that game."
+      - name: ts_percentage
+        description: "True Shooting % (0-1)."
+      - name: efg_percentage
+        description: "Effective FG% (0-1)."
+      - name: usg_percentage
+        description: "Usage rate in % (0-100)."
+      - name: pct_fga
+        description: "Share of FGA for the player relative to the team's total."
+      - name: pct_fgm
+        description: "Share of FGM for the player relative to the team's total."
+      - name: pct_fta
+        description: "Share of FTA for the player relative to the team's total."
+      - name: pct_ftm
+        description: "Share of FTM for the player relative to the team's total."
+      - name: pct_oreb
+        description: "Share of OREB for the player relative to the team's total."
+      - name: pct_dreb
+        description: "Share of DREB for the player relative to the team's total."
+      - name: pct_reb
+        description: "Share of total rebounds for the player."
+      - name: pct_blk
+        description: "Share of blocks for the player relative to team total."
+      - name: pct_3pa
+        description: "Share of 3-point attempts for the player."
+      - name: pct_3pm
+        description: "Share of 3-point makes for the player."
+      - name: pct_ast
+        description: "Share of assists for the player relative to team total."
+      - name: pct_stl
+        description: "Share of steals for the player relative to team total."
+      - name: pct_tov
+        description: "Share of turnovers for the player relative to team total."
+      - name: pct_pts
+        description: "Share of points for the player relative to team total."
+      - name: player_key
+        description: "Surrogate key from dim_player."
+      - name: team_key
+        description: "Surrogate key from dim_team."
+      - name: season_key
+        description: "Surrogate key from dim_season."
+      - name: game_key
+        description: "Surrogate key from dim_game."
+      - name: row_hash
+        description: "MD5 hash for changed-row detection in incremental loads."
+      - name: fact_player_adv_key
+        description: "Primary key for the fact_player_adv_stats table."
+      - name: record_created_timestamp
+        description: "Timestamp when this row was first inserted."
+      - name: record_updated_timestamp
+        description: "Timestamp when this row was last updated."
+      - name: record_updated_by
+        description: "Process/user that updated this row last."
+
+
+  # --------------------------------------------------
+  #  fact_team_adv_stats
+  # --------------------------------------------------
+  - name: fact_team_adv_stats
+    description: "Advanced team metrics (eFG%, Off Rating, team share, etc.) each game."
+    columns:
+      - name: team_id
+        description: "ID for the main team in the row."
+      - name: team_name
+        description: "Name of the team at that time."
+      - name: team_abbreviation
+        description: "Abbreviation of the team."
+      - name: season
+        description: "Which season this game took place in."
+      - name: season_type
+        description: "Regular, Preseason, or Postseason, etc."
+      - name: game_id
+        description: "Natural key for the game."
+      - name: game_date
+        description: "Date of the game."
+      - name: matchup
+        description: "Text representation of the matchup."
+      - name: home_team
+        description: "Abbreviation for the home team from the base data."
+      - name: away_team
+        description: "Abbreviation for the away team from the base data."
+      - name: win_loss
+        description: "Indicates if this team won (W) or lost (L)."
+      - name: team_ts_percentage
+        description: "Team-level True Shooting % (0-1)."
+      - name: team_efg_percentage
+        description: "Team-level Effective FG% (0-1)."
+      - name: team_3pt_rate
+        description: "3-point attempt rate (3PA / FGA)."
+      - name: team_tov_percentage
+        description: "Turnover rate for the team."
+      - name: team_off_rating
+        description: "Points per 100 partial_possessions."
+      - name: team_ft_rate
+        description: "FTA per FGA for the team."
+      - name: team_pct_fga
+        description: "Team's share of total FGA vs. opponent."
+      - name: team_pct_fgm
+        description: "Team's share of total FGM vs. opponent."
+      - name: team_pct_fta
+        description: "Team's share of total FTA vs. opponent."
+      - name: team_pct_ftm
+        description: "Team's share of total FTM vs. opponent."
+      - name: team_pct_oreb
+        description: "Team's share of total OREB vs. opponent."
+      - name: team_pct_dreb
+        description: "Team's share of total DREB vs. opponent."
+      - name: team_pct_reb
+        description: "Team's share of total rebounds vs. opponent."
+      - name: team_pct_blk
+        description: "Team's share of total blocks vs. opponent."
+      - name: team_pct_3pa
+        description: "Team's share of total 3PA vs. opponent."
+      - name: team_pct_3pm
+        description: "Team's share of total 3PM vs. opponent."
+      - name: team_pct_ast
+        description: "Team's share of total assists vs. opponent."
+      - name: team_pct_stl
+        description: "Team's share of total steals vs. opponent."
+      - name: team_pct_tov
+        description: "Team's share of total turnovers vs. opponent."
+      - name: team_pct_pts
+        description: "Team's share of total points vs. opponent."
+      - name: opp_team_id
+        description: "The opposing team's ID for that game."
+      - name: opp_team_points
+        description: "Opponent's total points."
+      - name: opp_team_fga
+        description: "Opponent's FGA."
+      - name: opp_team_fgm
+        description: "Opponent's FGM."
+      - name: opp_team_fg3a
+        description: "Opponent's 3-point attempts."
+      - name: opp_team_fg3m
+        description: "Opponent's 3-point makes."
+      - name: opp_team_fta
+        description: "Opponent's free throws attempted."
+      - name: opp_team_ftm
+        description: "Opponent's free throws made."
+      - name: opp_team_tov
+        description: "Opponent's turnovers."
+      - name: opp_team_oreb
+        description: "Opponent's offensive rebounds."
+      - name: opp_team_dreb
+        description: "Opponent's defensive rebounds."
+      - name: opp_team_reb
+        description: "Opponent's total rebounds."
+      - name: opp_team_ast
+        description: "Opponent's assists."
+      - name: opp_team_stl
+        description: "Opponent's steals."
+      - name: opp_team_blk
+        description: "Opponent's blocks."
+      - name: main_team_key
+        description: "dim_team surrogate key for the main team."
+      - name: season_key
+        description: "dim_season surrogate key."
+      - name: game_key
+        description: "dim_game surrogate key."
+      - name: row_hash
+        description: "MD5 hash to detect changed rows for incremental loads."
+      - name: fact_team_adv_key
+        description: "Primary key for fact_team_adv_stats."
+      - name: record_created_timestamp
+        description: "Timestamp inserted on creation."
+      - name: record_updated_timestamp
+        description: "Timestamp last updated."
+      - name: record_updated_by
+        description: "Name or process that last updated this record."
+
+
+  # --------------------------------------------------
+  #  dim_player
+  # --------------------------------------------------
+  - name: dim_player
+    description: "SCD2 dimension table tracking players and their team affiliation changes over time."
+    columns:
+      - name: player_key
+        description: "Surrogate key for a unique version of a player's dimension record."
+      - name: player_id
+        description: "Natural key for the player from source data."
+      - name: player_name
+        description: "Player's name at that dimension record version."
+      - name: team_id
+        description: "Team ID during that version block."
+      - name: team_abbreviation
+        description: "Team abbreviation for that version block."
+      - name: team_name
+        description: "Team name for that version block."
+      - name: row_hash
+        description: "MD5 hash of the dimension attributes used for change detection."
+      - name: debut_date
+        description: "Start date for this dimension record's validity."
+      - name: final_date
+        description: "End date for this dimension record's validity."
+      - name: is_current
+        description: "Whether this dimension record is the active one for the player."
+      - name: record_created_timestamp
+        description: "Timestamp when this dim record was created."
+      - name: record_updated_timestamp
+        description: "Timestamp when this dim record was updated."
+      - name: record_updated_by
+        description: "Process or user that last updated this dim record."
+
+
+  # --------------------------------------------------
+  #  dim_team
+  # --------------------------------------------------
+  - name: dim_team
+    description: "SCD2 dimension for team data, capturing name or abbreviation changes over time."
+    columns:
+      - name: team_id
+        description: "Natural key for the team from the source."
+      - name: team_name
+        description: "Team name in that dimension version."
+      - name: team_abbreviation
+        description: "Team abbreviation in that dimension version."
+      - name: debut_date
+        description: "Start date of this dimension record's validity."
+      - name: final_date
+        description: "End date of this dimension record's validity."
+      - name: is_current
+        description: "TRUE if this record is the active SCD version for that team."
+      - name: row_hash
+        description: "MD5 hash of the team attributes for SCD detection."
+      - name: team_key
+        description: "Surrogate primary key for the dim_team record version."
+      - name: record_created_timestamp
+        description: "Timestamp when this record was created."
+      - name: record_updated_timestamp
+        description: "Timestamp when this record was last updated."
+      - name: record_updated_by
+        description: "Process or user that last updated this dimension record."
+
+
+  # --------------------------------------------------
+  #  dim_season
+  # --------------------------------------------------
+  - name: dim_season
+    description: "Dimension table defining each season, its date range, and season type."
+    columns:
+      - name: season_key
+        description: "Surrogate key for the season dimension."
+      - name: season_id
+        description: "Season label or ID (e.g., '2022')."
+      - name: season_name
+        description: "Readable name combining season_id and season_type, e.g. '2022 - Regular'."
+      - name: start_date
+        description: "Earliest game_date for this season & type."
+      - name: end_date
+        description: "Latest game_date for this season & type."
+      - name: season_type
+        description: "Regular, Preseason, Postseason, etc."
+
+
+  # --------------------------------------------------
+  #  dim_game
+  # --------------------------------------------------
+  - name: dim_game
+    description: "Dimension table for each game, referencing date key and team keys if needed."
+    columns:
+      - name: game_key
+        description: "Surrogate key for the game dimension."
+      - name: game_id
+        description: "Natural key for the game from the source system."
+      - name: date_key
+        description: "Foreign key referencing a date dimension (if used)."
+      - name: home_team_key
+        description: "dim_team surrogate key for the home team."
+      - name: away_team_key
+        description: "dim_team surrogate key for the away team."
+      - name: matchup
+        description: "Text describing the two teams playing (optional in dim_game)."
+      - name: win_loss
+        description: "Optional placeholder if storing outcome in the dim_game record."
+
+
+  # --------------------------------------------------
+  #  player_boxscores_view
+  # --------------------------------------------------
+  - name: player_boxscores_view
+    description: "View that selects base columns from the raw player boxscores (materialized as a view)."
+    columns:
+      - name: season_id
+        description: "Season ID from the raw table."
+      - name: player_id
+        description: "ID of the player in the raw table."
+      - name: player_name
+        description: "Name of the player in raw data."
+      - name: team_id
+        description: "Team ID from the raw data."
+      - name: team_abbreviation
+        description: "Team abbreviation from the raw data."
+      - name: team_name
+        description: "Team name from the raw data."
+      - name: game_id
+        description: "Game ID from the raw data."
+      - name: game_date
+        description: "Date of the game."
+      - name: matchup
+        description: "Raw matchup text (e.g. 'LAL @ BOS')."
+      - name: win_loss
+        description: "Indicates if the player's team won or lost."
+      - name: minutes_played
+        description: "Minutes played from the raw data."
+      - name: field_goals_made
+        description: "Number of field goals made (raw)."
+      - name: field_goals_attempted
+        description: "Number of field goals attempted (raw)."
+      - name: field_goal_percentage
+        description: "Field goal percentage as double in [0,1]."
+      - name: three_point_field_goals_made
+        description: "3-point FGs made (raw)."
+      - name: three_point_field_goals_attempted
+        description: "3-point FGs attempted (raw)."
+      - name: three_point_field_goal_percentage
+        description: "3-point percentage as double in [0,1]."
+      - name: free_throws_made
+        description: "Free throws made (raw)."
+      - name: free_throws_attempted
+        description: "Free throws attempted (raw)."
+      - name: free_throw_percentage
+        description: "FT% as double in [0,1]."
+      - name: offensive_rebounds
+        description: "Offensive rebounds from the raw data."
+      - name: defensive_rebounds
+        description: "Defensive rebounds from the raw data."
+      - name: rebounds
+        description: "Total rebounds from the raw data."
+      - name: assists
+        description: "Assists from raw data."
+      - name: steals
+        description: "Steals from raw data."
+      - name: blocks
+        description: "Blocks from raw data."
+      - name: turnovers
+        description: "Turnovers from raw data."
+      - name: personal_fouls
+        description: "Personal fouls from raw data."
+      - name: points
+        description: "Total points from raw data."
+      - name: plus_minus
+        description: "Plus-minus from raw data."
+      - name: fantasy_points
+        description: "Fantasy points if available in raw data."
+      - name: video_available
+        description: "Indicator if video highlight is available."
+      - name: season
+        description: "Season label from raw data (e.g. 2022)."
+      - name: season_type
+        description: "Season type from raw (regular, postseason, etc.)."
+      - name: year
+        description: "Derived year from the game date."
+      - name: month
+        description: "Derived month from the game date."
+      - name: day
+        description: "Derived day from the game date."
+
+
+  # --------------------------------------------------
+  #  team_boxscores_view
+  # --------------------------------------------------
+  - name: team_boxscores_view
+    description: "View/ephemeral that aggregates player boxscores at the team level for each (team_id, season, game_id)."
+    columns:
+      - name: team_id
+        description: "Team ID from the source."
+      - name: team_name
+        description: "Aggregated name of the team (expected to match across players)."
+      - name: team_abbreviation
+        description: "Aggregated team abbreviation."
+      - name: season
+        description: "Which season (raw) the game is in."
+      - name: game_id
+        description: "Unique identifier for the game."
+      - name: season_type
+        description: "Regular, Preseason, or Postseason in the raw data."
+      - name: game_date
+        description: "Date of the game."
+      - name: matchup
+        description: "Matchup string from raw data."
+      - name: win_loss
+        description: "Indicates if the team won or lost (aggregated from players)."
+      - name: home_team_id
+        description: "Identified home team ID from the data join."
+      - name: home_team_abbreviation
+        description: "Abbreviation for the home team."
+      - name: home_team_name
+        description: "Name of the home team."
+      - name: home_team_win_loss
+        description: "W/L for the home team."
+      - name: away_team_id
+        description: "Away team ID from the data join."
+      - name: away_team_abbreviation
+        description: "Abbreviation for the away team."
+      - name: away_team_name
+        description: "Name of the away team."
+      - name: away_team_win_loss
+        description: "W/L for the away team."
+      - name: is_on_home_team
+        description: "Boolean indicating if the current team_id is the home team."
+      - name: is_on_away_team
+        description: "Boolean indicating if the current team_id is the away team."
+      - name: team_points
+        description: "Sum of all points by players on this team for the game."
+      - name: team_fga
+        description: "Sum of all field goals attempted by the team."
+      - name: team_fgm
+        description: "Sum of all field goals made by the team."
+      - name: team_fg3a
+        description: "Sum of all 3-point attempts by the team."
+      - name: team_fg3m
+        description: "Sum of all 3-point makes by the team."
+      - name: team_fta
+        description: "Sum of all free throw attempts by the team."
+      - name: team_ftm
+        description: "Sum of all free throws made by the team."
+      - name: team_tov
+        description: "Sum of all turnovers by the team."
+      - name: team_oreb
+        description: "Sum of offensive rebounds by the team."
+      - name: team_dreb
+        description: "Sum of defensive rebounds by the team."
+      - name: team_reb
+        description: "Sum of total rebounds by the team."
+      - name: team_ast
+        description: "Sum of assists by the team."
+      - name: team_stl
+        description: "Sum of steals by the team."
+      - name: team_blk
+        description: "Sum of blocks by the team."
+      - name: partial_possessions
+        description: "Sum(FGA + 0.44*FTA + TOV) for the team."
+      - name: team_fg_pct
+        description: "Aggregated field goal percentage (0-1)."
+      - name: team_fg3_pct
+        description: "Aggregated 3-point percentage (0-1)."
+      - name: team_ft_pct
+        description: "Aggregated free throw percentage (0-1)."

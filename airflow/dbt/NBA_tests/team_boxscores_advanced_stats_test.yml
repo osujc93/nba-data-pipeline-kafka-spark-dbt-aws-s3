@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: team_boxscores_advanced_stats
+    tests:
+      - dbt_utils.not_null:
+          column_name: off_rtg
+      - dbt_utils.not_null:
+          column_name: def_rtg
+
+      - dbt_utils.check_numeric_range:
+          column_name: net_rtg
+          min_value: -200
+          max_value: 200
+
+      - dbt_utils.check_numeric_range:
+          column_name: team_efg_pct
+          min_value: 0
+          max_value: 1
+
+      - dbt_utils.check_numeric_range:
+          column_name: team_ts_pct
+          min_value: 0
+          max_value: 2
+
+      - dbt_utils.check_numeric_range:
+          column_name: team_tov_pct
+          min_value: 0
+          max_value: 1
+
+      - dbt_utils.check_numeric_range:
+          column_name: team_oreb_pct
+          min_value: 0
+          max_value: 1
+
+      - dbt_utils.check_numeric_range:
+          column_name: team_dreb_pct
+          min_value: 0
+          max_value: 1

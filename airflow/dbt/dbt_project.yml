@@ -1,0 +1,30 @@
+name: 'nba_team_stats_project'
+version: '1.0.0'
+config-version: 2
+
+# Where dbt looks for models:
+model-paths: ["NBA_models"]
+
+# Where dbt looks for tests:
+test-paths: ["NBA_tests"]
+
+# Seeds and snapshots:
+seed-paths: ["seeds"]
+snapshot-paths: ["snapshots"]
+
+# The target name to use from profiles.yml
+profile: 'nba_iceberg_profile'
+
+target-path: "target"
+clean-targets: ["target"]
+
+# Default config for *all* models in this project
+models:
+  nba_team_stats_project:
+    +materialized: table
+
+    text_models:
+      +schema: 'iceberg_nba_player_boxscores_texts'
+      
+flags:
+  require_certificate_validation: false

@@ -1,0 +1,30 @@
+version: 2
+
+models:
+  - name: team_boxscores
+    tests:
+      - dbt_utils.not_null:
+          column_name: team_id
+      - dbt_utils.not_null:
+          column_name: game_id
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns: [team_id, game_id, season]
+
+      - dbt_utils.check_numeric_range:
+          column_name: team_points
+          min_value: 0
+          max_value: 300
+
+      # Newly added columns
+      - dbt_utils.check_numeric_range:
+          column_name: team_oreb
+          min_value: 0
+          max_value: 100
+      - dbt_utils.check_numeric_range:
+          column_name: team_dreb
+          min_value: 0
+          max_value: 100
+      - dbt_utils.check_numeric_range:
+          column_name: team_ast
+          min_value: 0
+          max_value: 100

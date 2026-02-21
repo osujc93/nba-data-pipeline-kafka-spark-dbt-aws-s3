@@ -1,22 +1,26 @@
 x-airflow-common: &airflow-common
   build:
     context: .
-    dockerfile: ./airflow/Dockerfile.airflow2
+    dockerfile: ./airflow/Dockerfile.airflow
   env_file:
     - ./.env
   environment:
     &airflow-common-env
+    PYTHONPATH: /opt/airflow
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: "http://airflow-webserver:8080/execution"
     AIRFLOW__CORE__EXECUTOR: CeleryExecutor
-    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
-    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
-    AIRFLOW__CELERY__BROKER_URL: redis://:@redis:6379/0
-    AIRFLOW__CORE__FERNET_KEY: 'HPqWFGaV0SS7c8c9oyfTBeZuJNR7TYgQGcqZTe0RHk0='
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/nelonba
+    AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/nelonba
+    AIRFLOW__CELERY__BROKER_URL: redis://redis:6379/0
+    AIRFLOW__CORE__FERNET_KEY: 'gTQK_STo5MdNL4kSFwKnap0xS_lU0XTqXoeWdu3xNn0='
+    AIRFLOW__CORE__SECRET_KEY: 'c9663f24d06f7c2e159ad0ae6081cafcf2d1c8aa3b6cfd7f61ed30a1eff3c91d0f37df45b63bf693f8c1782f9b54f3e46f822b97102ea4730504a7b00c94d080'
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW__API_AUTH__JWT_SECRET}
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
-    AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
+    AIRFLOW__CORE__AUTH_MANAGER: "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager"
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     WEB_SERVER_WORKER_TIMEOUT: 600
-    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW__WEBSERVER__SECRET_KEY}  
+    AIRFLOW__API__SECRET_KEY: ${AIRFLOW__API__SECRET_KEY}  
     DOCKER_API_VERSION: '1.41'
     DOCKER_HOST: 'unix:///var/run/docker.sock'      
     AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
@@ -57,6 +61,7 @@ x-extra-hosts: &shared-hosts
   - "airflow-init:172.20.10.14"
   - "airflow-cli:172.20.10.15"
   - "flower:172.20.10.16"
+  - "airflow-dag-processor:172.20.10.17"
   - "spark-master1:172.20.10.40"
   - "spark-master2:172.20.10.41"
   - "spark-master3:172.20.10.42"
@@ -66,8 +71,10 @@ x-extra-hosts: &shared-hosts
   - "spark-client:172.20.10.46"
   - "spark-history:172.20.10.23"
   - "trino:172.20.10.24"
+  - "dbt-service:172.20.10.26"
   - "mlflow:172.20.10.29"
   - "superset:172.20.10.30"
+  - "pgadmin:172.20.10.31"
   - "zookeeper1:172.20.10.71"
   - "zookeeper2:172.20.10.72"
   - "zookeeper3:172.20.10.73"
@@ -135,9 +142,9 @@ services:
         ipv4_address: 172.20.10.9
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 30s
-      timeout: 10s
-      retries: 1
+      interval: 45s
+      timeout: 30s
+      retries: 6
 
   kafka1:
     build:
@@ -329,6 +336,7 @@ services:
     networks:
       nelo-data-pipeline:
         ipv4_address: 172.20.10.5
+        
   airflow-base:
     container_name: airflow-base
     build:
@@ -337,9 +345,29 @@ services:
     image: airflow-base:latest
     command: tail -f /dev/null
 
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: airflow-dag-processor
+    command: bash -c "airflow dag-processor"
+    user: "airflow"
+    group_add:
+      - "docker"
+    restart: always
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.17
+    extra_hosts: *shared-hosts
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - airflow-logs:/opt/airflow/logs
+
   airflow-webserver:
     <<: *airflow-common
-    command: bash -c "airflow webserver"
+    command: bash -lc "exec airflow api-server --apps core,execution"
     container_name: airflow-webserver
     user: "airflow"
     group_add:
@@ -349,13 +377,14 @@ services:
       AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG
       AIRFLOW__LOGGING__CELERY_LOGGING_LEVEL: DEBUG
       AIRFLOW__LOGGING__FAB_LOGGING_LEVEL: DEBUG
-      FLASK_LIMITER_STORAGE_URL: redis://:@redis:6379/0
-      AIRFLOW__CORE__FERNET_KEY: HPqWFGaV0SS7c8c9oyfTBeZuJNR7TYgQGcqZTe0RHk0=
+      FLASK_LIMITER_STORAGE_URL: redis://redis:6379/0
+      AIRFLOW__CORE__FERNET_KEY: 'gTQK_STo5MdNL4kSFwKnap0xS_lU0XTqXoeWdu3xNn0='
+      AIRFLOW__CORE__SECRET_KEY: 'c9663f24d06f7c2e159ad0ae6081cafcf2d1c8aa3b6cfd7f61ed30a1eff3c91d0f37df45b63bf693f8c1782f9b54f3e46f822b97102ea4730504a7b00c94d080'
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
       AIRFLOW__CORE__HOSTNAME_CALLABLE: 'socket.gethostname'
       AIRFLOW__PROVIDERS__DOCKER__DOCKEROPERATORMOUNT_TMP_DIR: "False"
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
-      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow      
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/nelonba
+      AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/nelonba
       _AIRFLOW_WWW_USER_USERNAME: ${_AIRFLOW_WWW_USER_USERNAME}
       _AIRFLOW_WWW_USER_PASSWORD: ${_AIRFLOW_WWW_USER_PASSWORD}
       WEB_SERVER_WORKER_TIMEOUT: 300  
@@ -368,7 +397,7 @@ services:
     ports:
       - "8082:8080"
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8082/health"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/api/v2/monitor/health >/dev/null || exit 1"]
       interval: 30s
       timeout: 30s
       retries: 10
@@ -411,7 +440,7 @@ services:
       S3_ENDPOINT: ${S3_ENDPOINT}
       S3_BUCKET: ${S3_BUCKET}
     healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      test: ["CMD", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -440,15 +469,13 @@ services:
 
   airflow-worker:
     <<: *airflow-common
-    command: bash -c "airflow celery worker"
+    command: bash -lc "exec airflow celery worker"
     container_name: airflow-worker
     user: "airflow"
     group_add:
       - "docker"
     healthcheck:
-      test:
-        - "CMD-SHELL"
-        - 'celery --app airflow.providers.celery.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}" || celery --app airflow.executors.celery_executor.app inspect ping -d "celery@$${HOSTNAME}"'
+      test: ["CMD-SHELL", "celery --app airflow.providers.celery.executors.celery_executor.app inspect ping || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -459,6 +486,8 @@ services:
       AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG
       AIRFLOW__LOGGING__CELERY_LOGGING_LEVEL: DEBUG  
       AIRFLOW__CORE__HOSTNAME_CALLABLE: 'socket.gethostname'
+      AIRFLOW__CELERY__WORKER_HOSTNAME_FORMAT: "worker@%h"
+      AIRFLOW__CELERY__WORKER_PIDFILE: "/opt/airflow/airflow-worker.pid"
       DBT_PROFILES_DIR: /dbt  
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
@@ -536,7 +565,18 @@ services:
       - |
         mkdir -p /sources/logs /sources/dags /sources/plugins
         airflow db migrate
-        airflow users create --username ${_AIRFLOW_WWW_USER_USERNAME} --password ${_AIRFLOW_WWW_USER_PASSWORD} --firstname Admin --lastname User --role Admin --email admin@example.com
+
+        if ! airflow users list | awk '{print $2}' | grep -qx "${_AIRFLOW_WWW_USER_USERNAME}"; then
+          airflow users create \
+            --username "${_AIRFLOW_WWW_USER_USERNAME}" \
+            --firstname "Admin" \
+            --lastname "User" \
+            --role "Admin" \
+            --email "${_AIRFLOW_WWW_USER_EMAIL}" \
+            --password "${_AIRFLOW_WWW_USER_PASSWORD}"
+        else
+          echo "Airflow user ${_AIRFLOW_WWW_USER_USERNAME} already exists; skipping."
+        fi
     environment:
       <<: *airflow-common-env
       AIRFLOW__LOGGING__LOGGING_LEVEL: DEBUG
@@ -703,10 +743,10 @@ services:
         condition: service_healthy
       zookeeper3:
         condition: service_healthy
-      zookeeper4:
-        condition: service_healthy  
+      zookeeper4: 
+        condition: service_started
       zookeeper5:
-        condition: service_healthy 
+        condition: service_started
     ports:
       - "7077:7077"
       - "9080:8080"
@@ -742,9 +782,9 @@ services:
       zookeeper3:
         condition: service_healthy
       zookeeper4:
-        condition: service_healthy  
+        condition: service_started
       zookeeper5:
-        condition: service_healthy 
+        condition: service_started
     ports:
       - "7078:7077"
       - "9081:8080"
@@ -780,9 +820,9 @@ services:
       zookeeper3:
         condition: service_healthy
       zookeeper4:
-        condition: service_healthy  
+        condition: service_started
       zookeeper5:
-        condition: service_healthy 
+        condition: service_started
     ports:
       - "7079:7077"
       - "9082:8080"
@@ -815,9 +855,9 @@ services:
       zookeeper3:
         condition: service_healthy
       zookeeper4:
-        condition: service_healthy  
+        condition: service_started
       zookeeper5:
-        condition: service_healthy 
+        condition: service_started
     ports:
       - "8090:8090"
     extra_hosts: *shared-hosts
@@ -849,9 +889,9 @@ services:
       zookeeper3:
         condition: service_healthy
       zookeeper4:
-        condition: service_healthy  
+        condition: service_started
       zookeeper5:
-        condition: service_healthy 
+        condition: service_started
     ports:
       - "8091:8090"
     extra_hosts: *shared-hosts
@@ -883,9 +923,9 @@ services:
       zookeeper3:
         condition: service_healthy
       zookeeper4:
-        condition: service_healthy  
+        condition: service_started
       zookeeper5:
-        condition: service_healthy 
+        condition: service_started
     ports:
       - "8092:8090"
     extra_hosts: *shared-hosts
@@ -916,11 +956,9 @@ services:
       zookeeper3:
         condition: service_healthy
       zookeeper4:
-        condition: service_healthy  
+        condition: service_started
       zookeeper5:
-        condition: service_healthy  
-    cap_add:
-      - NET_ADMIN
+        condition: service_started
       
   trino:
     container_name: trino
@@ -964,13 +1002,55 @@ services:
       zookeeper3:
         condition: service_healthy
       zookeeper4:
-        condition: service_healthy  
+        condition: service_started
       zookeeper5:
-        condition: service_healthy
+        condition: service_started
       postgres:
         condition: service_healthy 
       hive-metastore:
         condition: service_healthy 
+
+  dbt-service:
+    container_name: dbt-service
+    hostname: dbt-service
+    build:
+      context: .
+      dockerfile: ./dbt/Dockerfile.dbt
+    environment:
+      DBT_PROFILES_DIR: /dbt
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: dbt
+      POSTGRES_ROLE: ${POSTGRES_ROLE}
+      DBT_DEBUG: "true"
+      DBT_LOG_PATH: "/dbt/logs"
+      DBT_LOG_FORMAT: "json"
+      DBT_LOG_LEVEL: "debug"
+      DBT_SEND_ANONYMOUS_USAGE_STATS: "false"   
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_BUCKET: ${S3_BUCKET}
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.26
+    ports:
+      - "8585:8080"
+    volumes:
+      - ./dbt:/dbt
+    command: sleep infinity
+    healthcheck:
+      test: ["CMD", "dbt", "--version"]
+      interval: 1m
+      timeout: 30s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    extra_hosts: *shared-hosts
 
   mlflow:
     build:
@@ -1034,11 +1114,39 @@ services:
       zookeeper3:
         condition: service_healthy
       zookeeper4:
-        condition: service_healthy  
+        condition: service_started  
       zookeeper5:
-        condition: service_healthy 
+        condition: service_started 
       postgres:
         condition: service_healthy
+
+  pgadmin:
+    build:
+      context: .
+      dockerfile: ./pgadmin/Dockerfile.pgadmin
+    container_name: pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: 'True'
+      PGADMIN_SECRET_KEY: ${PGADMIN_SECRET_KEY} 
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+      POSTGRES_HOST: ${POSTGRES_HOST}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_ROLE: ${POSTGRES_ROLE}
+    ports:
+      - "8089:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      nelo-data-pipeline:
+        ipv4_address: 172.20.10.31 
+    depends_on:
+      postgres:
+        condition: service_healthy  
 
   zookeeper1:
     build:
@@ -1199,7 +1307,7 @@ services:
     container_name: spark-jupyter
     build:
       context: .
-      dockerfile: ./Spark-Cluster/Dockerfile.spark-jupyter
+      dockerfile: ./sparkCluster/Dockerfile.spark-jupyter
     hostname: spark-jupyter
     ports:
       - "8079:8888"
@@ -1220,9 +1328,9 @@ services:
       zookeeper3:
         condition: service_healthy
       zookeeper4:
-        condition: service_healthy  
+        condition: service_started
       zookeeper5:
-        condition: service_healthy 
+        condition: service_started
     networks:
       nelo-data-pipeline:
         ipv4_address: 172.20.10.85
@@ -1296,6 +1404,8 @@ volumes:
 
   postgres-data:
 
+  pgadmin-data:
+
   redis-data: 
   trino_data:
-  airflow-logs:        
+  airflow-logs:

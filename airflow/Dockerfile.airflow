@@ -1,0 +1,5 @@
+FROM airflow-base:latest
+
+USER root
+
+USER airflow

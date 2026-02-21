@@ -1,0 +1,132 @@
+FROM apache/airflow:slim-3.1.7-python3.11
+
+USER root
+
+ENV TZ=America/New_York
+
+RUN apt-get update && apt-get install -y \
+    apt-utils vim wget gnupg software-properties-common sudo \
+    iproute2 bc lsof openssl curl \
+    build-essential libsasl2-dev g++ gcc make libssl-dev \
+    python3-dev libffi-dev libpq-dev \
+    iputils-ping isc-dhcp-client net-tools procps kmod netcat-openbsd dnsutils \
+    psmisc openjdk-17-jre sqlite3 redis-tools \
+    python3-pip libldap2-dev default-libmysqlclient-dev \
+    tzdata \
+    && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+    && echo $TZ > /etc/timezone 
+
+RUN usermod -aG sudo airflow && \
+    echo "airflow ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/airflow && \
+    chmod 0440 /etc/sudoers.d/airflow
+
+RUN apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m pip install --upgrade pip
+
+RUN mkdir -p /dbt /dbt/target /dbt/logs \
+    && chown -R airflow:root /dbt \
+    && chmod -R 755 /dbt
+
+RUN mkdir -p /opt/airflow/logs && chown -R airflow:root /opt/airflow/logs
+
+WORKDIR /opt/airflow
+ENV PYTHONPATH="/opt/airflow/dags:${PYTHONPATH}"
+
+USER airflow
+
+RUN pip install --no-cache-dir --upgrade \
+    Flask \
+    Flask-Login \
+    Flask-Session \
+    itsdangerous \
+    redis \
+    python-dateutil \
+    pytz
+
+RUN pip install --no-cache-dir \
+    apache-airflow==3.1.7 \
+    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.1.7/constraints-3.11.txt" \
+    apache-airflow-providers-fab \
+    asyncpg \
+    apache-airflow-providers-celery \
+    apache-airflow-providers-apache-spark \
+    apache-airflow-providers-docker \
+    apache-airflow-providers-redis \
+    kafka-python-ng \
+    six \
+    flower \
+    python-dotenv \
+    tenacity \
+    psycopg2 \
+    psycopg2-binary \
+    pydantic \
+    pandas \
+    python-dateutil \
+    pytz \
+    aiohttp \
+    aiokafka \
+    lz4 \
+    requests \
+    airflow-exporter \
+    thrift \
+    thrift-sasl \
+    pyopenssl \
+    pure-sasl \
+    memory-profiler 
+
+RUN pip install --no-cache-dir \
+    importlib-metadata
+
+RUN pip install --no-cache-dir \
+    #apache-superset \
+    requests
+
+ENV PYSPARK_PYTHON=/usr/bin/python3
+ENV PYSPARK_DRIVER_PYTHON=/usr/bin/python3
+
+RUN pip install --no-cache-dir \
+    dbt-core \
+    dbt-spark[PyHive] \
+    dbt-postgres \
+    pyspark==3.5.1 \
+    dbt-trino \
+    keyring
+
+ENV DBT_PROFILES_DIR=/dbt
+
+COPY /airflow/dbt/dbt_project.yml /dbt/dbt_project.yml
+COPY /airflow/dbt/profiles.yml /dbt/profiles.yml
+COPY /airflow/dbt/packages.yml /dbt/packages.yml
+
+COPY /airflow/dbt/NBA_models/ /dbt/NBA_models/
+#COPY /airflow/dbt/NBA_tests/ /dbt/tests/
+
+COPY ./dags /opt/airflow/dags/
+
+COPY /kafkaProducers /opt/airflow/kafkaProducers
+COPY /sparkJobs /opt/airflow/sparkJobs
+COPY /sparkJobs/xgboost4j /opt/airflow/sparkXGBoost4j
+
+COPY /superset/datasource_config.yaml /app/config/datasource_config.yaml
+
+COPY /airflow/superset/superset_nba_setup.py /app/superset_nba_setup.py
+
+USER root
+
+ENV SPARK_VERSION=3.5.1
+ENV HADOOP_VERSION=3
+ENV SPARK_HOME=/opt/spark
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+
+RUN wget -O /tmp/spark.tgz "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz" && \
+    tar -xzf /tmp/spark.tgz -C /opt && \
+    mv /opt/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION} /opt/spark && \
+    rm /tmp/spark.tgz
+
+ENV PATH="$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin"
+
+RUN groupadd -g 1001 docker && usermod -aG docker airflow
+
+USER airflow
