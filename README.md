@@ -120,6 +120,14 @@ Summary
 
    Kafka UI - http://localhost:8084
 
+4. To query via CLI:
+
+   ```sh
+   $ docker exec -it trino trino --server http://localhost:8085
+   
+   $ SELECT * FROM iceberg.iceberg_nba_player_boxscores.nba_player_boxscores WHERE year = 2026 ORDER BY team_name LIMIT 10;
+   ```
+
 Kafka (KRaft Mode)
 ===================
 
