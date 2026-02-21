@@ -1,0 +1,41 @@
+FROM python:3.9-slim
+
+RUN apt-get update && apt-get install -y \
+    openjdk-21-jdk-headless procps \
+    wget vim curl gnupg netcat-openbsd \
+    gcc g++ make libsasl2-dev libssl-dev \
+    python3-dev build-essential libkrb5-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install dbt-spark + extra deps
+RUN pip install --no-cache-dir \
+    pyspark==3.5.1 \
+    dbt-core \
+    dbt-spark[PyHive] \
+    thrift \
+    thrift-sasl \
+    sasl \
+    pyopenssl \
+    dbt-postgres \
+    dbt-trino \
+    keyring
+
+# Create a working directory
+WORKDIR /dbt
+RUN mkdir -p /dbt/logs && mkdir -p /dbt/target
+
+COPY /dbt/dbt_project.yml /dbt/dbt_project.yml
+COPY /dbt/NBA_models/ /dbt/NBA_models/
+COPY /dbt/NBA_snapshots /dbt/snapshots/
+COPY /dbt/packages.yml /dbt/packages.yml
+COPY /dbt/profiles.yml /dbt/profiles.yml
+
+COPY /dbt/start_service.sh /dbt/start_service.sh
+RUN chmod +x /dbt/start_service.sh
+
+ENV DBT_SEND_ANONYMOUS_USAGE_STATS=false
+
+ENTRYPOINT ["/dbt/start_service.sh"]

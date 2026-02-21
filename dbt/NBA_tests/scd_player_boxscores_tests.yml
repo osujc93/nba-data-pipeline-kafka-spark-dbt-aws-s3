@@ -1,0 +1,17 @@
+version: 2
+
+models:
+  - name: scd_player_boxscores
+    tests:
+      - dbt_utils.not_null:
+          column_name: row_hash
+      - dbt_utils.unique:
+          column_name: player_season_game_uk
+
+      - dbt_utils.check_numeric_range:
+          column_name: plus_minus
+          min_value: -100
+          max_value: 100
+
+      - dbt_utils.not_null:
+          column_name: points

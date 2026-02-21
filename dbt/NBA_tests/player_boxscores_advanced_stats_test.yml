@@ -1,0 +1,47 @@
+version: 2
+
+models:
+  - name: player_boxscores_advanced_stats
+    tests:
+      - dbt_utils.not_null:
+          column_name: ts_percentage
+
+      - dbt_utils.check_numeric_range:
+          column_name: ts_percentage
+          min_value: 0
+          max_value: 2
+
+      - dbt_utils.check_numeric_range:
+          column_name: efg_percentage
+          min_value: 0
+          max_value: 1
+
+      - dbt_utils.check_numeric_range:
+          column_name: usg_percentage
+          min_value: 0
+          max_value: 100
+
+      - dbt_utils.check_numeric_range:
+          column_name: pct_3pa
+          min_value: 0
+          max_value: 1
+
+      - dbt_utils.check_numeric_range:
+          column_name: pct_3pm
+          min_value: 0
+          max_value: 1
+
+      - dbt_utils.check_numeric_range:
+          column_name: pct_ast
+          min_value: 0
+          max_value: 1
+
+      - dbt_utils.check_numeric_range:
+          column_name: pct_tov
+          min_value: 0
+          max_value: 1
+
+      - dbt_utils.check_numeric_range:
+          column_name: pct_pts
+          min_value: 0
+          max_value: 1

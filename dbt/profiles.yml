@@ -1,0 +1,14 @@
+nba_iceberg_profile:
+  target: dev_trino
+  outputs:
+    dev_trino:
+      type: trino
+      method: none
+      host: trino
+      port: 8085
+      user: dbt_user
+      catalog: iceberg
+      schema: iceberg_nba_player_boxscores
+      threads: 4
+      session_properties: {}
+      http_headers: {}

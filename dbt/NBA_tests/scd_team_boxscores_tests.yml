@@ -1,0 +1,28 @@
+version: 2
+
+models:
+  - name: scd_team_boxscores
+    tests:
+      - dbt_utils.not_null:
+          column_name: row_hash
+      - dbt_utils.unique:
+          column_name: team_scd_uk
+
+      - dbt_utils.check_numeric_range:
+          column_name: team_points
+          min_value: 0
+          max_value: 300
+
+      # Check new columns
+      - dbt_utils.check_numeric_range:
+          column_name: team_oreb
+          min_value: 0
+          max_value: 100
+      - dbt_utils.check_numeric_range:
+          column_name: team_dreb
+          min_value: 0
+          max_value: 100
+      - dbt_utils.check_numeric_range:
+          column_name: team_ast
+          min_value: 0
+          max_value: 100
