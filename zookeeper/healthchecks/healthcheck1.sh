@@ -12,7 +12,7 @@ exec > >(tee -a "$LOG_FILE") 2>&1
 export ZK_IS_CLIENT=true
 
 # Source the zkenv.sh to set environment variables for client
-source /apache-zookeeper-3.8.4-bin/bin/zkEnv.sh
+source /apache-zookeeper-3.8.5-bin/bin/zkEnv.sh
 
 # Function to log messages
 log_message() {
@@ -23,7 +23,7 @@ log_message() {
 check_quorum() {
     log_message "Checking if Zookeeper is in a quorum..."
 
-    output=$(timeout 10 /apache-zookeeper-3.8.4-bin/bin/zkServer.sh status)
+    output=$(timeout 10 /apache-zookeeper-3.8.5-bin/bin/zkServer.sh status)
     if [ -z "$output" ]; then
         log_message "No response from Zookeeper."
         return 1
@@ -95,7 +95,7 @@ check_mntr_command() {
     log_message "Executing mntr command on $(hostname) using zkCli.sh with SASL authentication..."
 
     # Execute the mntr command by piping it into zkCli.sh
-    output=$(echo "stat" | /apache-zookeeper-3.8.4-bin/bin/zkCli_client.sh -server zookeeper-quorum-server1:2181,zookeeper-quorum-server2:2181,zookeeper-quorum-server3:2181,zookeeper-quorum-learner4:2181,zookeeper-quorum-learner5:2181 2>&1)
+    output=$(echo "stat" | /apache-zookeeper-3.8.5-bin/bin/zkCli_client.sh -server zookeeper-quorum-server1:2181,zookeeper-quorum-server2:2181,zookeeper-quorum-server3:2181,zookeeper-quorum-learner4:2181,zookeeper-quorum-learner5:2181 2>&1)
 
     if echo "$output" | grep -q "zk_version"; then
         log_message "Successfully executed mntr command on $(hostname) using zkCli.sh."

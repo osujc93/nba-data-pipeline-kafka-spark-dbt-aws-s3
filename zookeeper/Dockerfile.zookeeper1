@@ -43,19 +43,6 @@ RUN wget https://repo1.maven.org/maven2/org/bouncycastle/bcutil-jdk18on/1.79/bcu
 
 #RUN rm /apache-zookeeper-3.8.4-bin/lib/jline-2.14.6.jar /apache-zookeeper-3.8.4-bin/lib/jline-2.14.6.LICENSE.txt
 
-RUN rm /apache-zookeeper-3.8.4-bin/lib/slf4j-api-1.7.30.jar /apache-zookeeper-3.8.4-bin/lib/slf4j-1.7.30.LICENSE.txt
-
-# Set JAVA_HOME environment variable and other system variables
-ENV JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64" \
-    PATH="$JAVA_HOME/bin:$PATH" \
-    LD_LIBRARY_PATH="/lib/x86_64-linux-gnu:/usr/lib:$LD_LIBRARY_PATH" \
-    ZOOCFGDIR="/conf" \
-    ZOO_CONF_FILE="/conf/zoo.cfg" \
-    ZOO_LOG_DIR="/logs" \
-    ZOO_CONF_DIR="/conf" \
-    ZK_NODE_ID="1" \
-    ZOO_DATA_DIR="/data"
-
 # Create the zookeeper1 user with a home directory and set permissions
 RUN useradd -m -s /bin/bash zookeeper1 && \
     echo "zookeeper1:Nelo123456789" | chpasswd && \

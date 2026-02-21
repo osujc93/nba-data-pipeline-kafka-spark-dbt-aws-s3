@@ -9,11 +9,10 @@ LOG_FILE="/logs/start_zookeeper.log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 # Set Java environment
-export JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64"
-export PATH="$JAVA_HOME/bin:$PATH"
 export ZK_NODE_ID=3
 
 echo "3" > /data/myid
+echo "3" > /data/zookeeper_server.pid
 
 # Ports used by ZooKeeper
 client_port=2181
