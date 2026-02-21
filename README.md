@@ -123,9 +123,9 @@ Summary
 Kafka (KRaft Mode)
 ===================
 
-Cluster runs in KRaft mode, with a dedicated controller and 3 brokers.
+- Cluster runs in KRaft mode, with a dedicated controller and 3 brokers.
 
-The controller manages all cluster metadata, replacing the need for ZooKeeper. The brokers store and replicate the topic data.
+- The controller manages all cluster metadata, replacing the need for ZooKeeper. The brokers store and replicate the topic data.
 
 Spark Standalone
 ==================
