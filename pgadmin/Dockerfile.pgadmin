@@ -1,0 +1,39 @@
+FROM elestio/pgadmin:REL-8_13
+
+# Switch to root user to install packages
+USER root
+
+# Set environment variables
+ENV PGADMIN_CONFIG_SERVER_MODE=True
+ENV PGADMIN_SECRET_KEY=${PGADMIN_SECRET_KEY}
+
+# Update Alpine packages and install py3-virtualenv
+RUN apk update && \
+    apk add --no-cache \
+        py3-virtualenv \
+        postgresql-dev \
+        gcc \
+        musl-dev \
+        libffi-dev \
+        openssl-dev \
+        python3-dev \
+        cargo \
+        gettext && \
+    rm -rf /var/cache/apk/*
+
+# Create a virtual environment at /opt/venv using virtualenv
+RUN virtualenv /opt/venv
+
+# Ensure that pip is up-to-date within the virtual environment
+RUN /opt/venv/bin/pip install --upgrade pip
+
+# Update PATH to include the virtual environment's bin directory
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY ./pgadmin/servers.json /tmp/servers.json
+
+COPY ./pgadmin/entrypoint_wrapper.sh /entrypoint_wrapper.sh
+RUN chmod +x /entrypoint_wrapper.sh
+
+# Use wrapper script as entrypoint
+ENTRYPOINT ["/entrypoint_wrapper.sh"]

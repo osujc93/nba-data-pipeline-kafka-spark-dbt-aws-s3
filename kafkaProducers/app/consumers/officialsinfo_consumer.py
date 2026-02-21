@@ -1,0 +1,164 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import from_json, col, year, month, dayofmonth, current_date, lit, explode, sum as spark_sum, avg, window, to_date
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, BooleanType, DoubleType
+import logging
+import os
+from azure.storage.blob import BlobServiceClient
+import io
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', filename='app.log', filemode='w')
+logger = logging.getLogger(__name__)
+
+bootstrap_servers = ['kafka1:9092', 'kafka2:9093', 'kafka3:9094']
+
+azure_blob_service_client = BlobServiceClient.from_connection_string(
+    f"DefaultEndpointsProtocol=https;AccountName={os.getenv('AZURE_ACCOUNT_NAME')};AccountKey={os.getenv('AZURE_ACCOUNT_KEY')};EndpointSuffix=core.windows.net"
+)
+
+def create_spark_connection():
+    try:
+        azure_account_name = os.getenv('AZURE_ACCOUNT_NAME')
+        azure_account_key = os.getenv('AZURE_ACCOUNT_KEY')
+        azure_container = os.getenv('AZURE_CONTAINER')
+        
+        spark = SparkSession.builder \
+            .appName('OfficialsInfo') \
+            .config("spark.jars.packages", 
+                    "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.1,"
+                    "org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.5.2,"
+                    "org.apache.hadoop:hadoop-azure:3.4.0,"
+                    "org.apache.hadoop:hadoop-azure-datalake:3.4.0") \
+            .config("spark.hadoop.fs.azure", "org.apache.hadoop.fs.azure.NativeAzureFileSystem") \
+            .config(f"spark.hadoop.fs.azure.account.key.{azure_account_name}.blob.core.windows.net", azure_account_key) \
+            .config("spark.sql.warehouse.dir", f"abfss://{azure_container}@{azure_account_name}.dfs.core.windows.net/warehouse") \
+            .enableHiveSupport() \
+            .getOrCreate()
+        
+        spark.sql("CREATE DATABASE IF NOT EXISTS mlb_db")
+        
+        logger.info("Spark connection created successfully.")
+        return spark
+    except Exception as e:
+        logger.error(f"Error creating Spark connection: {e}", exc_info=True)
+        raise
+
+def create_tables(spark, azure_container, azure_account_name):
+    try:
+        # Creating the officials_info table
+        spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS mlb_db.officials_info (
+            official_type STRING,
+            official_id INT,
+            official_full_name STRING,
+            game_date DATE,
+            game_time STRING,
+            game_id STRING
+        ) USING iceberg
+        PARTITIONED BY (year(game_date), month(game_date))
+        LOCATION 'abfss://{azure_container}@{azure_account_name}.dfs.core.windows.net/mlb_db/officials_info'
+        """)
+
+        # Creating star schema tables
+        spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS mlb_db.dim_officials (
+            official_id INT,
+            official_full_name STRING
+        ) USING iceberg
+        PARTITIONED BY (official_id)
+        LOCATION 'abfss://{azure_container}@{azure_account_name}.dfs.core.windows.net/mlb_db/dim_officials'
+        """)
+
+        spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS mlb_db.fact_officials (
+            official_id INT,
+            official_type STRING,
+            game_date DATE,
+            game_time STRING,
+            game_id STRING
+        ) USING iceberg
+        PARTITIONED BY (year(game_date), month(game_date))
+        LOCATION 'abfss://{azure_container}@{azure_account_name}.dfs.core.windows.net/mlb_db/fact_officials'
+        """)
+
+        logger.info("Tables created successfully.")
+    except Exception as e:
+        logger.error(f"Error creating tables: {e}", exc_info=True)
+        raise
+
+def read_and_write_stream(spark):
+    try:
+        schema = StructType([
+            StructField("official_type", StringType(), True),
+            StructField("official_id", IntegerType(), True),
+            StructField("official_full_name", StringType(), True),
+            StructField("game_date", StringType(), True),
+            StructField("game_time", StringType(), True),
+            StructField("game_id", StringType(), True)
+        ])
+
+        kafka_df = spark.readStream \
+            .format('kafka') \
+            .option('kafka.bootstrap.servers', 'kafka1:9092,kafka2:9093,kafka3:9094') \
+            .option('subscribe', 'officials_info') \
+            .option('startingOffsets', 'earliest') \
+            .load()
+
+        officials_df = kafka_df.selectExpr("CAST(value AS STRING)") \
+            .select(from_json(col("value"), schema).alias("data")).select("data.*")
+
+        officials_df = officials_df.withColumn("game_date", to_date("game_date", "yyyy-MM-dd")) \
+                                   .withColumn("year", year("game_date")) \
+                                   .withColumn("month", month("game_date"))
+
+        # Write officials_info table
+        officials_df.writeStream \
+            .format("iceberg") \
+            .option("path", f"abfss://{azure_container}@{azure_account_name}.dfs.core.windows.net/mlb_db/officials_info") \
+            .option("checkpointLocation", "/tmp/checkpoints/officials_info") \
+            .outputMode("append") \
+            .start()
+
+        # Write to star schema tables
+        dim_officials_df = officials_df.select("official_id", "official_full_name").distinct()
+        dim_officials_df.writeStream \
+            .format("iceberg") \
+            .option("path", f"abfss://{azure_container}@{azure_account_name}.dfs.core.windows.net/mlb_db/dim_officials") \
+            .option("checkpointLocation", "/tmp/checkpoints/dim_officials") \
+            .outputMode("append") \
+            .start()
+
+        fact_officials_df = officials_df.select(
+            col("official_id"),
+            col("official_type"),
+            col("game_date"),
+            col("game_time"),
+            col("game_id"),
+            col("year"),
+            col("month")
+        )
+        fact_officials_df.writeStream \
+            .format("iceberg") \
+            .option("path", f"abfss://{azure_container}@{azure_account_name}.dfs.core.windows.net/mlb_db/fact_officials") \
+            .option("checkpointLocation", "/tmp/checkpoints/fact_officials") \
+            .outputMode("append") \
+            .start()
+
+        logger.info("Streaming data from Kafka to Iceberg tables initiated successfully.")
+    except Exception as e:
+        logger.error(f"Error in read_and_write_stream function: {e}", exc_info=True)
+        raise
+
+def main():
+    try:
+        spark = create_spark_connection()
+        azure_container = os.getenv('AZURE_CONTAINER')
+        azure_account_name = os.getenv('AZURE_ACCOUNT_NAME')
+        create_tables(spark, azure_container, azure_account_name)
+        read_and_write_stream(spark)
+        spark.stop()
+        logger.info("Main function executed successfully.")
+    except Exception as e:
+        logger.error(f"Error in main function: {e}", exc_info=True)
+
+if __name__ == "__main__":
+    main()

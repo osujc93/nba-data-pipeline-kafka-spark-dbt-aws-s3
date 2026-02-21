@@ -55,7 +55,7 @@ class SparkSessionManager:
             self.spark = (
                 SparkSession.builder.appName(self.app_name)
                 .config("spark.sql.warehouse.dir", f"s3a://{bucket_name}/warehouse")
-                .config("spark.hadoop.fs.s3a.endpoint", "s3.us-east-2.amazonaws.com")
+                .config("spark.hadoop.fs.s3a.endpoint", "s3.us-east-1.amazonaws.com")
                 .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
                 .config("spark.hadoop.fs.s3a.path.style.access", "false")
                 .config(

@@ -1,0 +1,3 @@
+databases:
+  - database_name: "Trino"
+    sqlalchemy_uri: trino://dbt_user@trino:8085/iceberg/iceberg_nba_player_boxscores

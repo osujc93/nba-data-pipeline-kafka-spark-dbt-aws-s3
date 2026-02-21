@@ -1,0 +1,114 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Postgres Default",
+      "Group": "Servers",
+      "Host": "${POSTGRES_HOST}",
+      "Port": ${POSTGRES_PORT},
+      "MaintenanceDB": "${POSTGRES_DB}",
+      "Username": "${POSTGRES_USER}",
+      "Password": "${POSTGRES_PASSWORD}",
+      "SSLMode": "prefer",
+      "Role": "${POSTGRES_ROLE}"
+    },
+    "2": {
+      "Name": "Airflow Postgres",
+      "Group": "Servers",
+      "Host": "${POSTGRES_HOST}",
+      "Port": ${POSTGRES_PORT},
+      "MaintenanceDB": "${POSTGRES_AIRFLOW_DB}",
+      "Username": "${POSTGRES_USER}",
+      "Password": "${POSTGRES_PASSWORD}",
+      "SSLMode": "prefer",
+      "Role": "${POSTGRES_ROLE}"
+    },
+    "3": {
+      "Name": "Superset Postgres",
+      "Group": "Servers",
+      "Host": "${POSTGRES_HOST}",
+      "Port": ${POSTGRES_PORT},
+      "MaintenanceDB": "${POSTGRES_SUPERSET_DB}",
+      "Username": "${POSTGRES_USER}",
+      "Password": "${POSTGRES_PASSWORD}",
+      "SSLMode": "prefer",
+      "Role": "${POSTGRES_ROLE}"
+    },
+    "4": {
+      "Name": "Hive Metastore Postgres",
+      "Group": "Servers",
+      "Host": "${POSTGRES_HOST}",
+      "Port": ${POSTGRES_PORT},
+      "MaintenanceDB": "${POSTGRES_HIVE_DB}",
+      "Username": "${POSTGRES_USER}",
+      "Password": "${POSTGRES_PASSWORD}",
+      "SSLMode": "prefer",
+      "Role": "${POSTGRES_ROLE}"
+    },
+    "5": {
+      "Name": "MLflow Postgres",
+      "Group": "Servers",
+      "Host": "${POSTGRES_HOST}",
+      "Port": ${POSTGRES_PORT},
+      "MaintenanceDB": "${POSTGRES_MLFLOW_DB}",
+      "Username": "${POSTGRES_USER}",
+      "Password": "${POSTGRES_PASSWORD}",
+      "SSLMode": "prefer",
+      "Role": "${POSTGRES_ROLE}"
+    },
+    "6": {
+      "Name": "Trino Postgres",
+      "Group": "Servers",
+      "Host": "${POSTGRES_HOST}",
+      "Port": ${POSTGRES_PORT},
+      "MaintenanceDB": "${POSTGRES_TRINO_DB}",
+      "Username": "${POSTGRES_USER}",
+      "Password": "${POSTGRES_PASSWORD}",
+      "SSLMode": "prefer",
+      "Role": "${POSTGRES_ROLE}"
+    },
+    "7": {
+      "Name": "Qdrant Postgres",
+      "Group": "Servers",
+      "Host": "${POSTGRES_HOST}",
+      "Port": ${POSTGRES_PORT},
+      "MaintenanceDB": "${POSTGRES_QDRANT_DB}",
+      "Username": "${POSTGRES_USER}",
+      "Password": "${POSTGRES_PASSWORD}",
+      "SSLMode": "prefer",
+      "Role": "${POSTGRES_ROLE}"
+    },
+    "8": {
+      "Name": "Haystack Postgres",
+      "Group": "Servers",
+      "Host": "${POSTGRES_HOST}",
+      "Port": ${POSTGRES_PORT},
+      "MaintenanceDB": "${POSTGRES_HAYSTACK_DB}",
+      "Username": "${POSTGRES_USER}",
+      "Password": "${POSTGRES_PASSWORD}",
+      "SSLMode": "prefer",
+      "Role": "${POSTGRES_ROLE}"
+    },
+    "9": {
+      "Name": "Spark Postgres",
+      "Group": "Servers",
+      "Host": "${POSTGRES_HOST}",
+      "Port": ${POSTGRES_PORT},
+      "MaintenanceDB": "${POSTGRES_SPARK_DB}",
+      "Username": "${POSTGRES_USER}",
+      "Password": "${POSTGRES_PASSWORD}",
+      "SSLMode": "prefer",
+      "Role": "${POSTGRES_ROLE}"
+    },
+    "10": {
+      "Name": "Dbt Postgres",
+      "Group": "Servers",
+      "Host": "${POSTGRES_HOST}",
+      "Port": ${POSTGRES_PORT},
+      "MaintenanceDB": "${POSTGRES_DBT_DB}",
+      "Username": "${POSTGRES_USER}",
+      "Password": "${POSTGRES_PASSWORD}",
+      "SSLMode": "prefer",
+      "Role": "${POSTGRES_ROLE}"
+    }
+  }
+}
